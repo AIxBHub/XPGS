@@ -2,9 +2,14 @@ import json
 import sys
 import pandas as pd
 import requests
+from requests.adapters import HTTPAdapter, Retry
+
+retries = Retry(total = 20, backoff_factor= 0.1)
+s = requests.Session()
+s.mount('https://', HTTPAdapter(max_retries=retries))
 
 api_url = "https://www.pgscatalog.org/rest/"
-traits = pd.read_csv("traits.csv")
+traits = pd.read_csv("sheets/traits.csv")
 
 out={
     'trait_name':[],
@@ -21,7 +26,7 @@ out={
 
 for x in traits['id']:
     print(x)
-    response = requests.get(f"https://www.pgscatalog.org/rest/score/search?trait_id={x}")
+    response = s.get(f"https://www.pgscatalog.org/rest/score/search?trait_id={x}")
     response = response.json()
 
     #'ancestry_distribution': {'dev': {'dist': {'EUR': 100}, 'count': 408031}, 'eval': {'dist': {'EUR': 100}, 'count': 1}}
@@ -34,7 +39,7 @@ for x in traits['id']:
         if 'EUR' in pgs['ancestry_distribution'][category]['dist']:
             if pgs['ancestry_distribution'][category]['dist']['EUR'] == 100 or pgs['samples_variants'][0]['cohorts'][0]['name_short'] == 'UKB':
                #https://www.pgscatalog.org/rest/performance/search?pgs_id=PGS000001
-                performance = requests.get(f"https://www.pgscatalog.org/rest/performance/search?pgs_id={pgs['id']}")
+                performance = s.get(f"https://www.pgscatalog.org/rest/performance/search?pgs_id={pgs['id']}")
                 performance = performance.json()
 
                 check = False
@@ -59,7 +64,7 @@ for x in traits['id']:
 #                out['r2'].append(perf['performance_metrics']['othermetrics'][0]['estimate'])
 
 df = pd.DataFrame(out)
-df.to_csv('pgs_results.csv', index=False)
+df.to_csv('data/pgs_results.csv', index=False)
 
 filtered_df = pd.DataFrame()
 
@@ -70,26 +75,60 @@ for group_name, group_df in df.groupby('trait_id'):
     else:
         filtered_df = pd.concat([filtered_df, pd.DataFrame([group_df.loc[group_df['r2_max'].idxmax()]])])
 
-filtered_df.to_csv('pgs_results_filtered.csv', index=False)
+filtered_df.to_csv('data/pgs_results_filtered.csv', index=False)
 
 
 #                    ftp = pgs['ftp_harmonized_scoring_files']['GRCh38']['positions']
 #                    pgs_df = pd.read_csv(ftp, compression='gzip', sep = '\t', comment = '#', low_memory=False)
 
-rsid_list = []
+all_rsid_dfs = []
+
 for i,row in filtered_df.iterrows():
-    pgs_df = pd.read_csv(row['pgs_ftp'], compression='gzip', sep = '\t', comment = '#', low_memory = False)
+    dtype_dict = {
+        'rsID': str,
+        'chr_name': str,
+        'chr_position': 'Int64',
+        'hm_chr': str,
+        'hm_pos': 'Int64',
+        'hm_rsID': str,
+    }
+    
+    pgs_df = pd.read_csv(row['pgs_ftp'], 
+                         compression='gzip', 
+                         sep='\t', 
+                         comment='#', 
+                         low_memory=False, 
+                         dtype=dtype_dict, na_values=['NA', 'na', ''])
+    
     if 'rsID' in pgs_df.columns:
-        rsid_list.append(pgs_df['rsID'].tolist())
+        temp_df = pd.DataFrame()
+        temp_df['rsid'] = pgs_df['rsID']
+        
+        if 'chr_name' in pgs_df.columns:
+            temp_df['chr'] = pgs_df['chr_name']
+        else:
+            temp_df['chr'] = pgs_df.get('hm_chr', pd.NA)
+        temp_df['start_GRCh37'] = pgs_df.get('chr_position', pd.NA)
+        temp_df['start_GRCh38'] = pgs_df.get('hm_pos', pd.NA)
+        
+        # Add this dataframe to our list
+        all_rsid_dfs.append(temp_df)
 
-rsid_list = [id for sublist in rsid_list for id in sublist]
-print(len(rsid_list))
-rsid_set = list(set(rsid_list))
-print(len(rsid_set))
+rsid_df = pd.concat(all_rsid_dfs, ignore_index=True)
+rsid_df = rsid_df.drop_duplicates(subset='rsid').reset_index(drop=True)
 
-with open("union_rsIDs.txt", "w") as file:
-  for item in rsid_set:
-    file.write(str(item) + "\n")
+rsid_df.sort_values(['chr','start_GRCh38']).to_csv('data/union_rsID.csv', index=False)
+
+print(rsid_df)
+print(len(rsid_df))
+#rsid_list = [id for sublist in rsid_list for id in sublist]
+#print(len(rsid_list))
+#rsid_set = list(set(rsid_list))
+#print(len(rsid_set))
+
+#with open("union_rsIDs.txt", "w") as file:
+#  for item in rsid_set:
+#    file.write(str(item) + "\n")
 ### download scores
 #
 #for scorefile in df['pgs_ftp']:
