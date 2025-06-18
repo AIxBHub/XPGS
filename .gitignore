@@ -1,2 +1,10 @@
 .venv
 data
+var
+tmp
+.Rprofile
+.config
+container
+renv
+rstudio-login.txt
+rstudio-singularity
