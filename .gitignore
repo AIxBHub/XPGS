@@ -8,3 +8,7 @@ container
 renv
 rstudio-login.txt
 rstudio-singularity
+work
+.nextflow*
+slurm*.out
+vcf

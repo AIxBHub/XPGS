@@ -1,0 +1,5 @@
+dir: "/proj/jchunglab/data/ukb_geno_bct_pheno/bct_vars/ukb_imp_bct_vars_bgen"
+outdir: "vcf"
+reference: "hg38kg"
+threads: 12
+max_memory: 50000
