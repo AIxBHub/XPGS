@@ -93,7 +93,7 @@ for i,row in filtered_df.iterrows():
         'hm_rsID': str,
     }
     
-    pgs_df = pd.read_csv(row['pgs_ftp'], 
+    pgs_df = pd.read_csv(row['pgs_ftp'], ## download score file
                          compression='gzip', 
                          sep='\t', 
                          comment='#', 
