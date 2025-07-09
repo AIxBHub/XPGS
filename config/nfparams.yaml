@@ -1,5 +1,8 @@
 dir: "/proj/jchunglab/data/ukb_geno_bct_pheno/bct_vars/ukb_imp_bct_vars_bgen"
-outdir: "vcf"
-reference: "hg38kg"
+outdir: "vcf-GRCh37"
+reference: "GRCh37.87"
 threads: 12
-max_memory: 50000
+max_memory: 100000
+skip_vcf: false
+vcf_files: "vcf/ukb_imp_chr([1-9]+|X)_bct_vars_clean"
+data_directory: "data/"

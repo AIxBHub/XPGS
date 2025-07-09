@@ -11,4 +11,4 @@ rstudio-singularity
 work
 .nextflow*
 slurm*.out
-vcf
+vcf*

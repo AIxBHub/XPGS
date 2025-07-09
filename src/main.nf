@@ -1,5 +1,6 @@
 
 def chrs = (1..22).collect { it.toString() } + ['X']
+//def chrs = (22).collect { it.toString() } 
 
 def files = chrs.collect { chr -> 
     def bgen_file = file("${params.dir}/ukb_imp_chr${chr}_bct_vars.bgen") 
@@ -31,6 +32,7 @@ process cleanVCF {
 
     output:
     file "${vcf_file.baseName}_clean.vcf"
+    publishDir "${params.outdir}", mode: 'copy'
 
     script:
     """
@@ -58,12 +60,18 @@ process snpEff {
     script:
     """
     module load snpeff
-    snpEff -v ${params.reference} ${vcf_file} -csvStats ${vcf_file.baseName} > ${vcf_file.baseName}.ann.vcf
+    snpEff -v ${params.reference} ${vcf_file} -dataDir ${projectDir}/../${params.data_directory} -csvStats ${vcf_file.baseName} > ${vcf_file.baseName}.ann.vcf
     """
 }
 
 workflow {
-    bgenToVCF(grouped_files) |
-    cleanVCF |
-    snpEff
+
+    if (params.skip_vcf) {
+        def vcf_files = Channel.from(params.vcf_files) 
+        snpEff(vcf_files)
+    } else {
+        bgenToVCF(grouped_files) |
+        cleanVCF |
+        snpEff
+    }
 }
