@@ -54,7 +54,7 @@ process snpEff {
     output:
     file "${vcf_file.baseName}" //summary table
     file "${vcf_file.baseName}.genes.txt"
-    file "${vcf_file.baseName}.ann.vcf"
+    file "${vcf_file.baseName}.ann.vcf", emit: annotated_vcf
     publishDir "${params.outdir}", mode: 'copy'
 
     script:
@@ -64,14 +64,59 @@ process snpEff {
     """
 }
 
+process compileVariants {
+
+    input:
+    path vcf_files
+
+    output:
+    file "bct_variant_annotated.csv"
+    publishDir "${params.outdir}/data", mode: 'copy'
+
+    """
+    #!${projectDir}/.venv/bin/python3
+    
+    import sys
+    import os
+    import glob
+    sys.path.append('${projectDir}')
+    
+    import src.vcf as vcf
+    import pandas as pd
+
+    # Process all annotated VCF files
+    dfs = []
+    vcf_files = glob.glob('*.ann.vcf')
+    
+    for vcf_file in vcf_files:
+        print(f'Processing {vcf_file}...')
+        variant_dict = vcf.readVCF(vcf_file)
+        dfs.append(pd.DataFrame.from_dict(variant_dict))
+
+    # Concatenate all dataframes
+    if dfs:
+        df = pd.concat(dfs, ignore_index=True)
+        df.to_csv('bct_variant_annotated.csv', index=False)
+        
+        unique_variants = len(df['id'].unique())
+        print(f'{unique_variants} unique variants after compiling')
+    else:
+        print('No annotated VCF files found')
+    """
+}
+
+
 workflow {
 
     if (params.skip_vcf) {
         def vcf_files = Channel.from(params.vcf_files) 
-        snpEff(vcf_files)
+        def annotated_vcfs = snpEff(vcf_files)
     } else {
-        bgenToVCF(grouped_files) |
+        def annotated_vcfs = bgenToVCF(grouped_files) |
         cleanVCF |
         snpEff
     }
+
+    annotated_vcfs.annotated_vcf.collect() |
+    compileVariants
 }
