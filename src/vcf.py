@@ -1,6 +1,5 @@
 import pandas as pd
 import numpy as np
-import urllib3
 import vcfpy
 import os
 
@@ -73,13 +72,13 @@ def subsetVariants(model_id, annotated_variants):
     } 
 
     if type(annotated_variants) is str:
-        annotated_variants = pd.read_csv(annotated_variants)
+        annotated_variants = pd.read_csv(annotated_variants, index_col = 0)
 
     base_url="https://ftp.ebi.ac.uk/pub/databases/spot/pgs/scores/ID/ScoringFiles/Harmonized/ID_hmPOS_GRCh37.txt.gz"
 
     url = base_url.replace('ID', model_id)
 
-    print(f'getting annotated variants for {id}... @ {url}')
+    print(f'getting annotated variants for {model_id}... @ {url}')
 
     pgs_df = pd.read_csv(url, ## download score file
                          compression='gzip', 
@@ -89,14 +88,14 @@ def subsetVariants(model_id, annotated_variants):
                          dtype=dtype_dict, na_values=['NA', 'na', ''])
 
     score_variants = len(pgs_df['rsID'].unique())
-    print(f'{id} has {score_variants}...')
-    subset = annotated_variants[annotated_variants['id'].isin(pgs_df['rsID'])]
-    unique_variants = len(subset['id'].unique())
-    print(f'and {unique_variants} unique variants after compiling {id}')
+    print(f'{model_id} score file has {score_variants} unique variants...')
+    subset = annotated_variants[annotated_variants['id_x'].isin(pgs_df['rsID'])]## renamed to id_x after nodenorm there are 2 id cols, id_x (rsid) id_y (ensembl or ncbi)
+    unique_variants = len(subset['id_x'].unique()) 
+    print(f'There are {len(subset['id_x'])} variants and {unique_variants} unique variants in genotype subset.')
     return(subset)
 
 
-if __name__:
+if __name__ == '__main__':
     if os.path.isfile('data/bct_variant_annotated.csv'):
         id = 'PGS001990'
         subset = subsetVariants(id, 'data/bct_variant_annotated.csv')
@@ -106,7 +105,7 @@ if __name__:
         chrs = list(range(1,23)) + ['X']
     #    chrs = [1]
 
-        base_path = "vcf/ukb_imp_chr_bct_vars_clean.ann.vcf"
+        base_path = "vcf-GRCh37/ukb_imp_chr_bct_vars_clean.ann.vcf"
         dfs = []
         for chr in chrs:
             vcf_file = base_path.replace('chr',f'chr{chr}')
@@ -118,7 +117,7 @@ if __name__:
 
         df.to_csv('data/bct_variant_annotated.csv', index = False)
 
-        unique_variants = len(df['id'].unique())
+        unique_variants = len(df['id'].unique()) 
         print(f'{unique_variants} unique variants after compiling')
     #    print(df)
 
