@@ -1,0 +1,518 @@
+```{r}
+ldsc <- readRDS('../data/ldsc.rds')
+
+coef_shrink <- 0.95  # reduce this up to 0.4 if you have some (large) mismatch with the LD ref
+
+set.seed(1)  # to get the same result every time
+# takes less than 2 min with 4 cores
+
+multi_auto <- snp_ldpred2_auto(
+  corr, df_beta.filtered, h2_init = ldsc[['h2']],
+  vec_p_init = seq_log(1e-4, 0.2, length.out = 30), ncores = 24,
+  # use_MLE = FALSE,  # uncomment if you have convergence issues or when power is low (need v1.11.9)
+  allow_jump_sign = FALSE, shrink_corr = coef_shrink)
+str(multi_auto, max.level = 1)
+```
+```{r}
+library(ggplot2)
+auto <- multi_auto[[1]]  # first chain
+plot_grid(
+  qplot(y = auto$path_p_est) + 
+    theme_bigstatsr() + 
+    geom_hline(yintercept = auto$p_est, col = "blue") +
+    scale_y_log10() +
+    labs(y = "p"),
+  qplot(y = auto$path_h2_est) + 
+    theme_bigstatsr() + 
+    geom_hline(yintercept = auto$h2_est, col = "blue") +
+    labs(y = "h2"),
+  ncol = 1, align = "hv"
+)
+```
+
+```{r}
+# `range` should be between 0 and 2
+G2 <- snp_fastImputeSimple(G, ncores = 24)
+saveRDS(G2, file = '../data/G2.rds')
+```
+
+
+```{r}
+G2 <- readRDS(file = '../data/G2.rds')
+
+(range <- sapply(multi_auto, function(auto) diff(range(auto$corr_est))))
+(keep <- which(range > (0.95 * quantile(range, 0.95, na.rm = TRUE))))
+beta_auto <- rowMeans(sapply(multi_auto[keep], function(auto) auto$beta_est))
+pred_auto <- big_prodVec(G2, beta_auto, ind.row = ind.test, ind.col = df_beta.filtered[["_NUM_ID_"]])
+pred_auto
+pcor(pred_auto, y[ind.test], NULL)
+```
+
+```{r}
+library(bigsnpr)
+library(magrittr)
+library(s3)
+options(bigstatsr.check.parallel.blas = FALSE)
+#options(scipen=999)
+
+#Sys.setenv("AWS_DEFAULT_REGION" = "us-east-1")
+#Sys.setenv("AWS_S3_ENDPOINT" = "s3.amazonaws.com")
+#Sys.setenv("AWS_S3_ENDPOINT" = "s3.amazonaws.com")
+
+#ld_bucket = "s3://broad-alkesgroup-ukbb-ld/UKBB_LD/"
+#a <-readRDS('../data/ukb_geno_bct_pheno/ld_chr1.rds')
+#with(df_beta.filtered, snp_ldsc(ld, length(ld), chi2 = (beta / beta_se)^2,
+#                                sample_size = n_eff, blocks = NULL)))
+```
+# notes
+
+summary stats have 41M variants
+precomputed ukbb ld reference (14M) maps to 2M of those variants
+676k (~800k total) of the ukbb genotype variants map to summary stats
+
+workflow for precomputed should be:
+- load summary stats
+- load ld reference
+- map summary stats to ld info
+- filter smmary stats
+- extract ld correlations and compute scores
+- load genotype data
+- map genotype info to summary stats with ld scores
+- leaves us with... 141 variants 
+
+# vignette
+
+`bigsnpr` vignette:
+- https://privefl.github.io/bigsnpr/articles/LDpred2.html
+
+also working of of example with precomputed LD matrix:
+- https://github.com/privefl/paper-infer/blob/main/code/example-with-provided-LD.R
+
+To run LDpred2, you need
+
+- GWAS summary statistics with marginal effect sizes, their standard errors, and the corresponding sample size(s),
+- an LD (correlation) matrix computed from individuals of the same genetic ancestry as individuals used in the GWAS,
+- individual-level data for tuning hyper-parameters (when using LDpred2-grid or lassosum2) and for testing the final models.
+
+# inputs
+
+- `summ_stats/mcv.assoc` -- UKBB Mean Corpuscular Volume summary stats -- https://ftp.sanger.ac.uk/pub/project/humgen/summary_statistics/UKBB_blood_cell_traits/
+  - https://pmc.ncbi.nlm.nih.gov/articles/PMC7482360/
+- `map_hms_plus.rds` -- https://doi.org/10.6084/m9.figshare.21305061 -- LD reference (correlations between pairs of genetic variants) for 1,444,196 HapMap3+ variants based on European individuals of the UK biobank.
+- `EUR_hg38.bed` -- plink output of 1KG phase 3 genotype data
+
+# load hapmap3+
+```{r}
+#map_ldref <- readRDS('../data/hm3/map_hms_plus.rds')
+#str(map_ldref)
+```
+
+# compile ld ref ukbb 
+```{r}
+#ld_meta_files <- list.files('../data/ukbb_ld','.gz', full.names = T)
+#
+#
+#ld_info <- lapply(ld_meta_files, function(x){
+#    read.table(x, sep = '', header = T)
+#}) 
+#
+#ld_info <- ld_info %>%
+#  dplyr::bind_rows()
+#
+#ld_info <- ld_info %>%
+#  dplyr::rename('chr' = 'chromosome',
+#                'pos' = 'position',
+#                'a0' = 'allele1',
+#                'a1' = 'allele2')
+#
+```
+
+# genotype data
+```{r}
+
+obj.bigSNP <- snp_attach("../data/ukb_geno_bct_pheno/ukb_cal_merged.rds")
+
+map <- obj.bigSNP$map %>%
+#  dplyr::select(chromosome, marker.ID, physical.pos, allele1, allele2) %>%
+  dplyr::mutate(chromosome = as.integer(chromosome)) %>%
+  dplyr::rename('chr' = 'chromosome',
+                'rsid' = 'marker.ID',
+                'pos' = 'physical.pos',
+                'a0' = 'allele1',
+                'a1' = 'allele2')
+
+```
+
+
+# load summary stats
+```{r}
+# Read external summary statistics
+sumstats <- bigreadr::fread2("../data/summ_stats/mcv.assoc")
+str(sumstats)
+
+sumstats <- sumstats %>%
+#  dplyr::select(CHR_num, ID, BP, REF, ALT, EFFECT, SE) %>%
+  dplyr::rename('chr' = 'CHR_num', 
+                'rsid' = 'ID',
+                'pos' = 'BP',
+                'a0' = 'REF',
+                'a1' = 'ALT',
+                'beta' = 'EFFECT',
+                'beta_se' = 'SE') %>%
+  dplyr::mutate(n_eff = 408112)
+
+
+```
+
+# map variants
+mapping variants in summary stats to ld reference (HapMap3+ precomputed)
+get 1.4M variants of the 41M in sumstats
+```{r}
+#test <- sumstats[sumstats$P <= 0.0001,]
+
+df_beta <- snp_match(sumstats, ld_info, join_by_pos = F)
+
+(df_beta <- tidyr::drop_na(tibble::as_tibble(df_beta)))
+
+(df_beta.filtered <- df_beta[as.double(df_beta$P) <= 0.00001,])
+
+```
+
+# filter variants
+
+Following example, this drops a lot of variants. 
+
+
+```{r}
+#df_beta
+## better to use af of GWAS and INFO scores as well (then can use 0.7 instead of 0.5 in L43)
+## (cf. https://privefl.github.io/bigsnpr/articles/LDpred2.html#quality-control-of-gwas-summary-statistics)
+#sd_ldref <- with(df_beta, sqrt(2 * ALT_FREQ * (1 - ALT_FREQ)))
+#sd_ss <- with(df_beta, 2 / sqrt(n_eff * beta_se^2 + beta^2))
+##
+#is_bad <-
+#  sd_ss < (0.5 * sd_ldref) | sd_ss > (sd_ldref + 0.1) | sd_ss < 0.05 | sd_ldref < 0.05
+##
+##library(ggplot2)
+##qplot(sd_ldref, sd_ss, color = is_bad, alpha = I(0.5)) +
+##  theme_bigstatsr() +
+##  coord_equal() +
+##  scale_color_viridis_d(direction = -1) +
+##  geom_abline(linetype = 2, color = "red") +
+##  labs(x = "Standard deviations derived from allele frequencies of the LD reference",
+##       y = "Standard deviations derived from the summary statistics",
+##       color = "Removed?")
+##
+#(df_beta <- df_beta[!is_bad, ])
+
+
+write.csv(df_beta.filtered, 
+          file = '../data/df_beta.csv', quote = F, sep = ',', row.names = F, col.names = T)
+# Here, you also want to restrict to the variants present
+# in your test data as well. For this, you can use something like
+#in_test <- vctrs::vec_in(df_beta[, c("chr", "pos")], map_ldref[, c("chr", "pos")])
+#df_beta <- df_beta[in_test, ]
+#
+#tmp <- tempfile(tmpdir = "tmp-data")
+```
+```{r}
+
+match <- snp_match(df_beta.filtered, map, join_by_pos = F, match.min.prop = 0)
+write.csv(match, file = '../data/ukbb_geno_match.csv', quote = F, col.names = T, row.names = F)
+```
+
+## sanity check
+
+```{r}
+df_beta <- snp_match(sumstats, map, join_by_pos = T)
+
+## testing
+#map_pgs <- dplyr::select(df_beta.filtered, chr, pos, rsid, a0, a1) ; map_pgs$beta <- 1
+#snp_match(map_pgs, map, join_by_pos = F)
+#
+# map_hg19 <- snp_modifyBuild(map,
+#                            liftOver = '../bin/liftOver',
+#                            from = "hg38", 
+#                            to = "hg19")
+#
+####
+sd_g <- with(df_beta, sqrt(2 * ALT_FREQ * (1 - ALT_FREQ)))
+sd_ss <- with(df_beta, 2 / sqrt(n_eff * beta_se^2 + beta^2))
+#
+is_bad <-
+  sd_ss < (0.5 * sd_g) | sd_ss > (sd_g + 0.1) | sd_ss < 0.05 | sd_g < 0.05
+#
+#library(ggplot2)
+#qplot(sd_ldref, sd_ss, color = is_bad, alpha = I(0.5)) +
+#  theme_bigstatsr() +
+#  coord_equal() +
+#  scale_color_viridis_d(direction = -1) +
+#  geom_abline(linetype = 2, color = "red") +
+#  labs(x = "Standard deviations derived from allele frequencies of the LD reference",
+#       y = "Standard deviations derived from the summary statistics",
+#       color = "Removed?")
+#
+
+(df_beta.filtered <- df_beta[!is_bad, ])
+(df_beta.filtered <- df_beta.filtered[as.double(df_beta.filtered$P) <= 0.1,])
+
+write.csv(df_beta.filtered, file = '../data/ukbb_geno_match-HighConf.csv', quote = F, row.names = F)
+```
+
+
+
+```{r}
+```
+
+#### Stop
+
+```{r}
+region_length = 3000000
+region_keys <- data.frame(chr = character(), 
+                          start = character(),
+                          end = character(),
+                          gz = character(),
+                          npz = character(),
+                          stringsAsFactors = F)
+
+skipped = 0
+for(chr in unique(df_beta$chr)){
+  chr_df = df_beta[df_beta$chr == chr,]
+  for(region_start in seq(1,max(chr_df$pos),region_length)){
+    region_end = region_start + region_length
+    df_region = chr_df[chr_df$pos >= region_start & chr_df$pos <= region_end,]
+    if(nrow(df_region) == 0) {
+      skipped = skipped + 1
+      print(paste0('skipping:',chr,' ',region_start))
+            next
+    }
+    
+    key.npz = paste0(ld_bucket,'chr',chr,'_',region_start,'_',region_end,'.npz') 
+    key.gz = paste0(ld_bucket,'chr',chr,'_',region_start,'_',region_end,'.gz') 
+    
+    row = data.frame(chr = as.character(chr),
+                     start = as.character(region_start),
+                     end = as.character(region_end),
+                     gz = key.gz,
+                     npz = key.npz)
+    region_keys = dplyr::bind_rows(region_keys, row)
+  }
+}
+print(skipped)
+
+region_keys
+
+write.table(region_keys[,c('gz','npz')], file = 'region_keys.cvs', sep = ',', quote = F, col.names = F, row.names = F)
+```
+
+
+
+# load LD reference
+```{r}
+test <- read.table('../data/ukbb_ld/chr1_1_3000001.gz', sep = '', header = T)
+test
+map_ldref
+read.table('../data/ukbb_ld/chr1_1_3000001.npz')
+
+library(reticulate)
+scipy_sparse = import("scipy.sparse")
+csr_matrix = scipy_sparse$load_npz('../data/ukbb_ld/chr1_1_3000001.npz')
+test = matrix(csr_matrix)
+typeof(csr_matrix)
+df_beta
+test = csr_matrix[ind.chr3, ind.chr3]
+test@
+test[ind.chr3, ind.chr3]
+test = Matrix::sparseMatrix(i = csr_matrix@i+1,
+                            j = csr_matrix@j+1,
+                            x = csr_matrix@x,
+                            dims = csr_matrix@Dim)
+                            
+
+csr_matrix[14397,14397]
+head(csr_matrix)
+test <- readRDS("../data/hm3/corr_hm3_plus/LD_with_blocks_chr22.rds")
+test
+```
+
+
+```{r}
+ld_files <- list.files('../data/ukbb_ld', '*.npz', full.names = T)
+
+tmp <- tempfile(tmpdir = "tmp-data")
+
+for (chr in 1:22) {
+
+  cat(chr, ".. ", sep = "")
+
+  ## indices in 'df_beta'
+  ind.chr = which(df_beta$chr == chr)
+
+  # Get chromosome-specific files
+  chr_files = ld_files[grep(paste0("chr", chr, "_"), ld_files)]
+
+   # Extract region information from filenames
+  regions = data.frame(
+    file = chr_files,
+    start = as.numeric(gsub(".*chr\\d+_(\\d+)_(\\d+)\\.npz", "\\1", chr_files)),
+    end = as.numeric(gsub(".*chr\\d+_(\\d+)_(\\d+)\\.npz", "\\2", chr_files))
+  )
+
+  # Process SNPs in each region
+  for (i in 1:nrow(regions)) {
+    region = regions[i, ]
+    
+    # Find SNPs in this region
+    region_snps = ind.chr[df_beta$pos[ind.chr] >= region$start & 
+                          df_beta$pos[ind.chr] <= region$end]
+    
+    if (length(region_snps) == 0) next
+    
+    # Get corresponding indices
+    ind.chr2 = df_beta$`_NUM_ID_`[region_snps]
+    
+    ind.chr3 = match(ind.chr2, which(ld_info$chr == chr & 
+                                      ld_info$pos >= region$start & 
+                                      ld_info$pos <= region$end))
+    
+    corr_m = scipy_sparse$load_npz(region$file)
+    # Handle the case of a single value or small matrix
+    if (length(ind.chr3) == 1) {
+      # Create a 1x1 dgCMatrix instead of allowing conversion to numeric
+      corr_region = Matrix::sparseMatrix(
+        i = 1, 
+        j = 1, 
+        x = corr_m[ind.chr3, ind.chr3], 
+        dims = c(1,1)
+      )
+    } else {
+      corr_m = Matrix::sparseMatrix(i = corr_m@i+1, # correct for python indexing
+                                       j = corr_m@j+1,
+                                       x = corr_m@x,
+                                       dims = corr_m@Dim)
+      corr_region = corr_m[ind.chr3, ind.chr3]
+    }
+    if (chr == 1 && i == 1) {
+      corr <- as_SFBM(corr_region, tmp, compact = TRUE)
+    } else {
+      corr$add_columns(corr_region, nrow(corr))
+    } 
+  }
+}
+corr_m@shape
+   #HEREERE 
+  ## indices in 'map_ldref'
+  ind.chr2 <- df_beta$`_NUM_ID_`[ind.chr]
+
+  ## indices in 'corr_chr'
+  ind.chr3 <- match(ind.chr2, which(ld_info$chr == chr))
+  print(ind.chr3)
+    
+  corr_chr <- readRDS(paste0("../data/hm3/corr_hm3_plus/LD_with_blocks_chr", chr, ".rds"))[ind.chr3, ind.chr3]
+
+  if (chr == 1) {
+    corr <- as_SFBM(corr_chr, tmp, compact = TRUE)
+  } else {
+    corr$add_columns(corr_chr, nrow(corr))
+  }
+}
+
+saveRDS(corr, file = '../data/corr.RDS')
+str(corr)
+```
+
+# estimate SNP-heritability
+```{r}
+NCORES <- 24 
+# SNP-heritability estimation from LD score regression,
+# to be used as a starting value in LDpred2-auto.
+# Here `ld` is a pre-computed column of `map_ldref` and therefore `df_beta`.
+# It corresponds to the pre-computed LD scores for the full set of HM3+ variants 
+# (therefore the need for `ld_size = nrow(map_ldref)` instead of `length(ld)`).
+(ldsc <- with(df_beta, snp_ldsc(ld, ld_size = nrow(map_ldref),
+                                chi2 = (beta / beta_se)^2,
+                                sample_size = n_eff,
+                                ncores = NCORES)))
+df_beta
+h2_est <- ldsc[["h2"]]
+sumstats
+
+```
+
+# run LDpred2-auto
+```{r}
+# LDpred2-auto
+multi_auto <- snp_ldpred2_auto(corr, df_beta, h2_init = h2_est,
+                               vec_p_init = seq_log(1e-4, 0.2, length.out = 30),
+                               allow_jump_sign = FALSE, shrink_corr = 0.95,
+                               ncores = NCORES) 
+
+# Filter for best chains and average remaining ones
+# -> the effects sizes of your polygenic score
+(range <- sapply(multi_auto, function(auto) diff(range(auto$corr_est))))
+(keep <- which(range > (0.95 * quantile(range, 0.95, na.rm = TRUE))))
+
+beta_auto <- rowMeans(sapply(multi_auto[keep], function(auto) auto$beta_est))
+
+```
+
+# load target data
+```{r}
+#ukb <- bigsnpr::snp_readBed2('../ukb_geno_bct_pheno/ukb_cal_merged.bed')
+#saveRDS(ukb, '../data/ukb_cal_merged.rds')
+# Load your target genotype data
+
+target_data <- bigsnpr::snp_attach("../data/1kG_all_hg38/EUR_hg38.rds") #ukb_geno_bct_pheno/ukb_cal_merged.rds")
+#snp_writeBed(target_data, ...) 
+
+G <- target_data$genotypes
+map <- target_data$map %>%
+  dplyr::rename('chr' = 'chromosome',
+                'rsid' = 'marker.ID',
+                'pos' = 'physical.pos',
+                'a0' = 'allele1',
+                'a1' = 'allele2') %>%
+  dplyr::mutate(chr = as.integer(chr))
+map  
+```
+
+
+```{r}
+
+if(!file.exists('../data/map_hg19.RData')){
+ map_hg19 <- snp_modifyBuild(map,
+                            liftOver = '../bin/liftOver',
+                            from = "hg38", 
+                            to = "hg19")
+ save(map_hg19, file = '../data/map_hg19.RData') 
+} else {
+  load('../data/map_hg19.RData')
+}
+
+```
+
+# match variants
+```{r}
+
+# Match variants
+map_pgs <- df_beta[c(1:4,6)]; map_pgs$beta <- 1
+map_pgs <- map_pgs %>%
+  dplyr::rename('rsid' = 'rsid.ss')
+
+# testing with unfiltered sum stats - could not match enough vars with filtered 
+map_pgs2 <- snp_match(map_pgs, map, join_by_pos = F, match.min.prop = 0.1)
+
+# subset the summary stat beta to just those variants retained after snp_match
+beta_auto.subset <- beta_auto[map_pgs2$`_NUM_ID_.ss`] # NUM_ID_.ss = corresponding row indices of the input sumstats 
+
+# Calculate polygenic scores
+pred_auto <- big_prodVec(G, beta_auto.subset * map_pgs2$beta,
+                       ind.col = map_pgs2[["_NUM_ID_"]], 
+                       ncores = NCORES)
+
+pred_auto
+
+```
+
+
+####
