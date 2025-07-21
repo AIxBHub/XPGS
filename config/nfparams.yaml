@@ -4,5 +4,6 @@ reference: "GRCh37.87"
 threads: 12
 max_memory: 100000
 skip_vcf: false
-vcf_files: "vcf/ukb_imp_chr([1-9]+|X)_bct_vars_clean"
+#vcf_files: "vcf/ukb_imp_chr([1-9]+|X)_bct_vars_clean"
 data_directory: "data/"
+pgs_ids: "PGS001990"
