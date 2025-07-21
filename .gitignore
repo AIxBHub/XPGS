@@ -12,3 +12,4 @@ work
 .nextflow*
 slurm*.out
 vcf*
+ukb_imp_bct_vars
