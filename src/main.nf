@@ -17,6 +17,7 @@ process bgenToVCF {
 
     output:
     file "${bgen_file.baseName}.vcf"
+ //   publishDir "${params.outdir}", mode: 'copy'
 
     script:
     """
@@ -26,12 +27,59 @@ process bgenToVCF {
 
 }
 
+process sortVCF {
+    input:
+    path vcf_file
+
+    output:
+    file "${vcf_file.baseName}_sorted.vcf"
+//    publishDir "${params.outdir}", mode: 'copy'
+
+    script:
+    """
+    module load bcftools
+    bcftools sort ${vcf_file} -o ${vcf_file.baseName}_sorted.vcf
+    """
+}
+
+process mergeVCF {
+    input:
+    path vcf_files
+
+    output:
+    file "ukb_imp_bct_vars_merged.vcf"
+    publishDir "${params.outdir}", mode: 'copy'
+
+    script:
+    """
+    module load bcftools
+    bcftools concat ${vcf_files} -o ukb_imp_bct_vars_merged.vcf
+    """
+}
+
+process vcfToBgen {
+    input:
+    path vcf_file
+
+    output:
+    file "${vcf_file.simpleName}.bed"
+    file "${vcf_file.simpleName}.bim"
+    file "${vcf_file.simpleName}.fam"
+    publishDir "${params.outdir}", mode: 'copy'
+
+    script:
+    """
+    module load plink/2.00
+    plink2 --vcf ${vcf_file} --make-bed --split-par --threads ${params.threads} --out ${vcf_file.simpleName}
+    """
+}
+
 process cleanVCF {
     input: 
     path vcf_file
 
     output:
-    file "${vcf_file.baseName}_clean.vcf"
+    file "${vcf_file.simpleName}_clean.vcf"
     publishDir "${params.outdir}", mode: 'copy'
 
     script:
@@ -43,7 +91,7 @@ process cleanVCF {
         } else {
         print \$1, \$2, \$3, \$4, \$5, \$6, \$7, \$8;
         }
-    }' "${vcf_file}" > "${vcf_file.baseName}_clean.vcf"
+    }' "${vcf_file}" > "${vcf_file.simpleName}_clean.vcf"
     """
 }
 
@@ -52,15 +100,15 @@ process snpEff {
     path vcf_file
 
     output:
-    file "${vcf_file.baseName}" //summary table
-    file "${vcf_file.baseName}.genes.txt"
-    file "${vcf_file.baseName}.ann.vcf"
+    file "${vcf_file.simpleName}" //summary table
+    file "${vcf_file.simpleName}.genes.txt"
+    file "${vcf_file.simpleName}.ann.vcf"
     publishDir "${params.outdir}", mode: 'copy'
 
     script:
     """
     module load snpeff
-    snpEff -v ${params.reference} ${vcf_file} -dataDir ${projectDir}/../${params.data_directory} -csvStats ${vcf_file.baseName} > ${vcf_file.baseName}.ann.vcf
+    snpEff -v ${params.reference} ${vcf_file} -dataDir ${projectDir}/../${params.data_directory} -csvStats ${vcf_file.simpleName} > ${vcf_file.simpleName}.ann.vcf
     """
 }
 
@@ -70,8 +118,15 @@ workflow {
         def vcf_files = Channel.from(params.vcf_files) 
         snpEff(vcf_files)
     } else {
-        bgenToVCF(grouped_files) |
-        cleanVCF |
+        
+        def merged_vcf_files = bgenToVCF(grouped_files) |
+        sortVCF |
+        collect |
+        mergeVCF
+
+        cleanVCF(merged_vcf_files) |
         snpEff
+
+        vcfToBgen(merged_vcf_files)
     }
 }
