@@ -104,39 +104,9 @@ process sortVCF {
     """
 }
 
-//process indexVCF {
-//    input:
-//    path vcf_file
-//
-//    output:
-//    file "${vcf_file}.tbi"
-//
-//    script:
-//    """
-//    module load bcftools
-//    bcftools index --tbi ${vcf_file}
-//    """
-//}
-////temp -- should incorporate compression with sort step
-//process compressVCF {
-//    stageInMode 'link' //pigz won't work with symbolic links
-//    
-//    input:
-//    path vcf_file
-//
-//    output:
-//    file "${vcf_file}.gz"
-//
-//    script:
-//    """
-//    pigz -p ${task.cpus} ${vcf_file}
-//    """
-//}
-
 process mergeVCF {
     input:
     path vcf_files
-//    path indexed_vcfs
 
     output:
     file "ukb_imp_bct_vars_merged.vcf"
@@ -192,9 +162,7 @@ process snpEff {
     path vcf_file
 
     output:
-    file "${vcf_file.simpleName}" //summary table
-    file "${vcf_file.simpleName}.genes.txt"
-    file "${vcf_file.simpleName}.ann.vcf"
+    tuple path("${vcf_file.simpleName}"), path("${vcf_file.simpleName}.genes.txt"), path("${vcf_file.simpleName}.ann.vcf")
     publishDir "${params.outdir}", mode: 'copy'
 
     script:
@@ -204,13 +172,68 @@ process snpEff {
     """
 }
 
+process generateAnnotationCSV {
+    publishDir "${params.outdir}", mode: 'copy'
+    
+    input:
+    path annotated_vcf
+
+    output:
+    path "${annotated_vcf.simpleName}_annotations.csv"
+
+    script:
+    """
+    #!/usr/bin/env python3
+    import pandas as pd
+    import numpy as np
+    import vcfpy
+    import os
+
+    def readVCF(vcf):
+        dict = {
+            'chrom' : [],
+            'pos' : [],
+            'id' : [],
+            'ann' : [],
+            'gene' : [],
+            'biotype' : []
+        }
+
+        vcf_reader = vcfpy.Reader.from_path(vcf)
+
+        for line in vcf_reader:
+            ## INFO -- dictionary with ANN as key to list of '|' delimited strings, each annotation is an element in the list
+            annotations = line.INFO.get('ANN',[]) 
+
+            ## extract variants that have annotations to protein coding genes
+            annotations = [a for a in annotations if 'protein_coding' in a or 'intergenic_region' in a] 
+
+            for anno in annotations: ## then loop the annotations
+     
+                fields = anno.split('|')
+
+                dict['chrom'].append(line.CHROM)
+                dict['pos'].append(line.POS)
+                dict['id'].append(line.ID[0])
+                
+                dict['ann'].append(fields[1])
+                dict['gene'].append(fields[4])
+                dict['biotype'].append(fields[7])
+
+        return(dict)
+    
+    # Read VCF annotations using the readVCF function
+    variant_dict = readVCF('${annotated_vcf}')
+    
+    # Convert to DataFrame and save as CSV
+    df = pd.DataFrame.from_dict(variant_dict).drop_duplicates()
+    df.to_csv('${annotated_vcf.simpleName}_annotations.csv', index=False)
+    
+    """
+}
+
 workflow {
 
-//    if (params.skip_vcf) {
-//        def vcf_files = Channel.from(params.vcf_files) 
-//        snpEff(vcf_files)
-//    } else {
-        
     def variant_list = extractPGSVariants(params.pgs_ids)
     // combine input bgen with the exctracted variant file
     // then map the plink files and variants to create a tuple input for bgenToVCF
@@ -225,7 +248,11 @@ workflow {
     
     //def merged_vcfs = mergeVCF(sorted_vcfs.collect(), indexed_vcfs.collect())
     // steps to make annotation files
-    cleanVCF(merged_vcfs) | snpEff
+    def clean_vcf = cleanVCF(merged_vcfs)
+    def snpeff_results = snpEff(clean_vcf)
+    
+    // Generate CSV of variant annotations - extract annotated VCF from tuple
+    generateAnnotationCSV(snpeff_results.map { stats, genes, vcf -> vcf })
     
     // converty back out to binary 
     vcfToBgen(merged_vcfs)

@@ -1,9 +1,9 @@
 dir: "/proj/jchunglab/data/ukb_geno_bct_pheno/bct_vars/ukb_imp_bct_vars_bgen"
-outdir: "ukb_imp_bct_vars"
+outdir: "PGS001990"
 reference: "GRCh37.87"
 threads: 12
 max_memory: 100000
-skip_vcf: false
+#skip_vcf: false
 #vcf_files: "vcf/ukb_imp_chr([1-9]+|X)_bct_vars_clean"
 data_directory: "data/"
 pgs_ids: "PGS001990"

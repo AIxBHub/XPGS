@@ -1,10 +1,12 @@
+.cache
 .venv
+.local
 data
 var
 tmp
 .Rprofile
 .config
-container
+*.sif
 renv
 rstudio-login.txt
 rstudio-singularity

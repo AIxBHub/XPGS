@@ -22,30 +22,12 @@ def readVCF(vcf):
     for line in vcf_reader:
 
         annotations = line.INFO.get('ANN',[]) ## INFO -- dictionary with ANN as key to list of '|' delimited strings, each annotation is an element in the list
-#        test = [a.split('|') for a in annotations]
-#        print(annotations['.11' in annotations]) 
 
         annotations = [a for a in annotations if 'protein_coding' in a or 'intergenic_region' in a] ## extract variants that have annotations to protein coding genes
-
-       # anno_filtered = [a for a in annotations if 'missense_variant' in a]
-       # print(anno_filtered)
-       # #if len(anno_filtered) == 0:
-       # #    anno_filtered = [a for a in annotations if 'synonymous_variant' in a]
-       # if len(anno_filtered) == 0:
-       #     anno_filtered = [a for a in annotations if 'UTR_variant' in a]
-       # elif len(anno_filtered) == 0:
-       #     anno_filtered = [a for a in annotations if 'intron_variant' in a]
-       # else:
-       #     continue
 
         for anno in annotations: ## then loop the annotations
  
             fields = anno.split('|')
-
-#            if line.ID in dict['id'] and fields[4] in dict['gene']: 
-#                ## check if that variant is already matched to that gene
-#                ## as in case of multiple transcripts from same gene in annotations 
-#                continue
 
             dict['chrom'].append(line.CHROM)
             dict['pos'].append(line.POS)
