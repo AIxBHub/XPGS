@@ -15,3 +15,5 @@ work
 slurm*.out
 vcf*
 ukb_imp_bct_vars
+tmp-data
+PGS*
