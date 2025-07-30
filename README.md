@@ -58,3 +58,6 @@ config file: `/nas/{CLUSTERNAME}/rhel8/apps/snpeff/5.2c/snpEff/snpEff.config`
 
 #TODO add instructions for `nn_id_from_snpeff.py`
 
+summary stats
+https://pmc.ncbi.nlm.nih.gov/articles/PMC7482360/
+https://ftp.sanger.ac.uk/pub/project/humgen/summary_statistics/UKBB_blood_cell_traits/

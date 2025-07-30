@@ -132,7 +132,7 @@ process vcfToBgen {
     script:
     """
     module load plink/2.00
-    plink2 --vcf ${vcf_file} --make-bed --split-par hg38 --threads ${params.threads} --out ${vcf_file.simpleName}
+    plink2 --vcf ${vcf_file} --make-bed --split-par hg38 --memory 500000 --threads ${task.cpus} --out ${vcf_file.simpleName}
     """
 }
 
