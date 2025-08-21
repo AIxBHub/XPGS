@@ -136,7 +136,8 @@ process vcfToBgen {
     """
 }
 
-process cleanVCF {
+// TODO -- fix this; there is a param in bcftools to drop genotypes with subset -G (after subsetting if -s is set)
+process clean_vcf {
     input: 
     path vcf_file
 
@@ -146,14 +147,8 @@ process cleanVCF {
 
     script:
     """
-    awk 'BEGIN { OFS="\t" }
-    {
-        if(/^##/ || (NR==1 && \$0 ~ /^#/)) {
-        print \$0;
-        } else {
-        print \$1, \$2, \$3, \$4, \$5, \$6, \$7, \$8;
-        }
-    }' "${vcf_file}" > "${vcf_file.simpleName}_clean.vcf"
+    module load bcftools
+    bcftools view -G ${vcf_file} -o ${vcf_file.simpleName}_clean.vcf 
     """
 }
 
@@ -227,12 +222,45 @@ process generateAnnotationCSV {
     
     # Convert to DataFrame and save as CSV
     df = pd.DataFrame.from_dict(variant_dict).drop_duplicates()
+
+    effects = "${params.effect}".split(',')
+    print(effects)
+    # grab variants of interest based on specific annotation(s) from params
+    df_VOI = df[df['ann'].isin(effects)]
+    df_VOI.to_csv('${annotated_vcf.simpleName}_effects.csv', index = False)
+    # save out all the annotations
     df.to_csv('${annotated_vcf.simpleName}_annotations.csv', index=False)
     
     """
 }
 
+process subset_vcf {
+    input:
+    path annotated_vcf
+    val effect_expression
+
+    output:
+    path ("${annotated_vcf.simpleName}_effects.vcf")
+    publishDir "${params.outdir}", mode: 'copy'
+
+    script:
+    """
+    module load snpeff
+    echo "${effect_expression}" > effect_expression.txt
+    snpSift filter -e effect_expression.txt ${annotated_vcf} > ${annotated_vcf.simpleName}_effects.vcf
+    """
+}
+
+// Function to build effect expression from a list of effects
+def buildEffectExpression(effects) {
+    return effects.collect { effect -> "ANN[*].EFFECT has '${effect}'" }.join(' | ')
+}
+
 workflow {
+    // Create a value channel for the effect expression
+    def effectsList = params.effect instanceof List ? params.effect : params.effect.split(',').collect { it.trim() }
+    def effectExpression = buildEffectExpression(effectsList)
+    def effectExpressionCh = Channel.value(effectExpression)
 
     def variant_list = extractPGSVariants(params.pgs_ids)
     // combine input bgen with the exctracted variant file
@@ -248,12 +276,13 @@ workflow {
     
     //def merged_vcfs = mergeVCF(sorted_vcfs.collect(), indexed_vcfs.collect())
     // steps to make annotation files
-    def clean_vcf = cleanVCF(merged_vcfs)
-    def snpeff_results = snpEff(clean_vcf)
+    def snpeff_results = snpEff(merged_vcfs)
     
-    // Generate CSV of variant annotations - extract annotated VCF from tuple
-    generateAnnotationCSV(snpeff_results.map { stats, genes, vcf -> vcf })
-    
+    clean_vcf(snpeff_results.map { stats, genes, vcf -> vcf }) | // drop genotypes from the annotated vcf
+        generateAnnotationCSV
+
+    // Use the effect expression channel with the subset_vcf process
+    subset_vcf(snpeff_results.map { stats, genes, vcf -> vcf }, effectExpressionCh) // subset to specified effect, retaining genotypes
     // converty back out to binary 
     vcfToBgen(merged_vcfs)
 }

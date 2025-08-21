@@ -86,7 +86,7 @@ if __name__ == "__main__":
     print(masks)
 #    masks = [torch.ones(5, 10), torch.ones(3, 5)]  # Example masks, replace with actual if needed
     net = SparseNet(activation_fn=torch.relu, in_size=10, out_size=1, masks=masks)
-
+    print(net)
     # Perform a forward pass
     output = net(X)
     print("Network output:", output[:5])
