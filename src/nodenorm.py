@@ -1,17 +1,24 @@
 # git clone https://github.com/RobokopU24/ORION.git
-# python 3.11.11 used
+# python 3.11.11 used ## MN switching to 3.12
 # pip install -r ORION/requirements.txt
 import sys
-sys.path.append("/Users/jchung/Documents/GRANT/2023_11_RFA_RM_23_003_CommonFundUtility/gits/ORION")
+sys.path.append("ORION")
 from Common import normalization
-
 import pandas as pd
 
+"""
+Script to run nodenorm on annotated variants output from nextflow pipeline. 
+Outputs csv with original variant to gene annotations, with additional equivalent identifiers
+TODO - should this be looped into nextflow ? it's only a single process run, but would be good to include in the automated workflow
+"""
+
+annotation_file = "PGS001990/ukb_imp_bct_vars_merged_clean_annotations.csv"
+endpoint = "https://nodenormalization-sri.renci.org/"  # This endpoint might not be permanent. 
 class respo():
     def __init__(self):
         #self.resp = resp
         self.nn = normalization.NodeNormalizer(conflate_node_types=False)
-        self.nn.node_norm_endpoint="https://nodenormalization-sri.renci.org/" # This endpoint might not be permanent. 
+        self.nn.node_norm_endpoint= endpoint
     
     def in_druglist(self, nodeid):
         nodes = []
@@ -25,7 +32,7 @@ class respo():
 resp = respo()
 
 # Read variant table, split rsID with multiple EMSEMBL matches, add curie prefix to each ENSEMBL ID
-df = pd.read_csv("BCT_related_variants_PGS_models/bct_variant_annotated.csv")
+df = pd.read_csv(annotation_file)
 df["gene"] = df["gene"].str.split("-")
 df = df.explode("gene").reset_index(drop=True)
 df["curie"] = [f"ENSEMBL:{x}" for x in df["gene"]]
@@ -38,4 +45,4 @@ dfgene = pd.DataFrame(dfgene)
 dfgene = dfgene.explode("equivalent_identifiers").reset_index(drop=True)
 
 merged = pd.merge(df, dfgene[["id", "equivalent_identifiers", "name"]], left_on="curie", right_on="equivalent_identifiers", how="left")
-merged.to_csv("/Users/jchung/Documents/GRANT/2023_11_RFA_RM_23_003_CommonFundUtility/Data/blood_cell_trait_ukbiobank/BCT_related_variants_PGS_models/bct_variant_annotated_nodenormed.csv")
+merged.to_csv(f"{annotation_file.split('.')[0]}-NodeNorm.csv", index = False)
