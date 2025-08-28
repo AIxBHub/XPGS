@@ -1,5 +1,10 @@
 from neo4j import GraphDatabase
 import pandas as pd
+from goatools.obo_parser import GODag
+from goatools.gosubdag.gosubdag import GoSubDag
+
+godag = GODag('data/GO/go-basic.obo',
+              optional_attrs={'relationship'})
 
 annotation_file = "PGS001990/ukb_imp_bct_vars_merged_clean_annotations-NodeNorm.csv"
 
@@ -39,7 +44,14 @@ with driver.session() as session:
         data = [r.data() for r in result]
 #        print(data[])
 #        exit() 
-        goids = list(set([dict['GO_id'] for dict in data]))
+        goids = [dict['GO_id'] for dict in data]
+        
+        for goid in goids:
+            print(goid)
+            gosubdag_r0 = GoSubDag([goid], godag, prt=None)
+            goids.append(gosubdag_r0.rcntobj.go2ancestors[goid])
+
+        goids = list(set(goids))
         #print(goids)
 #        df = pd.DataFrame([r.data() for r in result])
 #        if not df.empty:
