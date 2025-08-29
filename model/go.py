@@ -40,25 +40,30 @@ all_results = []
 gene_map = {}
 with driver.session() as session:
     for gene in genes:
+        print(gene)
         result = session.run(query, {"gene_name": gene, "taxon": taxon})
         data = [r.data() for r in result]
 #        print(data[])
 #        exit() 
         goids = [dict['GO_id'] for dict in data]
-        
+        anc = []
         for goid in goids:
-            print(goid)
+         #   if goid == 'GO:0008150': ## skip for root term BP
+         #       continue
             gosubdag_r0 = GoSubDag([goid], godag, prt=None)
-            goids.append(gosubdag_r0.rcntobj.go2ancestors[goid])
+            try:
+                anc += list(gosubdag_r0.rcntobj.go2ancestors[goid])
+            except KeyError:
+                continue
 
-        goids = list(set(goids))
+        anc = list(set(anc))
         #print(goids)
 #        df = pd.DataFrame([r.data() for r in result])
 #        if not df.empty:
-        if len(goids) > 0 :
+        if len(anc) > 0 :
 #            all_results.append(df)
 #            for go in df['GO_id'].values:
-            for go in goids:
+            for go in anc:
                 if go not in gene_map.keys():
                     gene_map[go] = [gene]
                 else:
