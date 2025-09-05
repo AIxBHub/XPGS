@@ -63,3 +63,15 @@ summary stats
 https://pmc.ncbi.nlm.nih.gov/articles/PMC7482360/
 
 https://ftp.sanger.ac.uk/pub/project/humgen/summary_statistics/UKBB_blood_cell_traits/
+
+## model notes
+
+DCell used GO subgraphs for training - network was defined by specific root terms eg dna repair. 
+
+I'm trying to use all terms associated with any gene with variants in our genotype data.
+
+pgs model variants --> subset ukb genotype to variants --> annotate variants --> subset to effect --> map to genes
+
+genes --> goids 
+
+so the network topology is defined by the variant subset we are going to use, not by a particular subgraph

@@ -36,7 +36,7 @@ genes = afile[afile['ann'].str.contains('|'.join(effects))]['name'].sort_values(
 all_results = []
 
 ## for testing
-#genes = genes[0:5]
+genes = genes[0:10]
 gene_map = {}
 with driver.session() as session:
     for gene in genes:
@@ -45,11 +45,19 @@ with driver.session() as session:
         data = [r.data() for r in result]
 #        print(data[])
 #        exit() 
+
+        ## extract a list of all goids associated with specific gene
         goids = [dict['GO_id'] for dict in data]
-        anc = []
+        anc=[]
         for goid in goids:
          #   if goid == 'GO:0008150': ## skip for root term BP
          #       continue
+                     # Add direct gene to GO term
+            if goid not in gene_map:
+                gene_map[goid] = []
+            if gene not in gene_map[goid]:
+                gene_map[goid].append(gene)
+
             gosubdag_r0 = GoSubDag([goid], godag, prt=None)
             try:
                 anc += list(gosubdag_r0.rcntobj.go2ancestors[goid])
@@ -57,9 +65,9 @@ with driver.session() as session:
                 continue
 
         anc = list(set(anc))
-        #print(goids)
-#        df = pd.DataFrame([r.data() for r in result])
-#        if not df.empty:
+        
+        ## loop through all the ancestor terms for gene
+        ## if the go term is not in the gene map dictionary keys add it as a key and assign gene
         if len(anc) > 0 :
 #            all_results.append(df)
 #            for go in df['GO_id'].values:
@@ -69,9 +77,33 @@ with driver.session() as session:
                 else:
                     gene_map[go].append(gene)
 
-gene_map_df = pd.DataFrame({'GOid' : gene_map.keys(), 'Genes' : gene_map.values()})
+with open('PGS001990/ontology.txt', 'w') as f:
+    for goid in gene_map.keys():
+        ngenes = len(gene_map[goid])
+        go_obj = godag[goid]
 
-gene_map_df.to_csv('gene_map.tsv', sep = '\t',index = False)
+        # Get direct children
+        direct_children = set()
+        for child in go_obj.get_goterms_lower():
+        # Check if this is a direct child
+            if goid in [parent.id for parent in child.parents]:
+                direct_children.add(child.id) 
+
+        f.write(f'ROOT: {goid} {ngenes}\n')
+        f.write(f'GENES: {' '.join(gene_map[goid])}\n')
+        f.write(f'TERMS: {' '.join(direct_children)}\n')
+
+    # Store the direct children
+#    for child in go_obj.children:
+#        child_id = child.id
+
+#        print(child_id)
+#gene_map_df = pd.DataFrame({'GOid' : gene_map.keys(), 'Genes' : gene_map.values()})
+
+#gene_map_df.to_csv('gene_map.tsv', sep = '\t',index = False)
+
+#print(gene_map_df)
+
 # Concatenate all results into one DataFrame
 #gtogo = pd.concat(all_results, ignore_index=True)
 
