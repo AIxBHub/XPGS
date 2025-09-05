@@ -3,15 +3,13 @@ import pandas as pd
 from goatools.obo_parser import GODag
 from goatools.gosubdag.gosubdag import GoSubDag
 
-godag = GODag('data/GO/go-basic.obo',
-              optional_attrs={'relationship'})
+# Load GO DAG
+godag = GODag('data/GO/go-basic.obo', optional_attrs={'relationship'})
 
 annotation_file = "PGS001990/ukb_imp_bct_vars_merged_clean_annotations-NodeNorm.csv"
 
 effects = ['missense_variant','splice_region_variant','stop_gained','5_prime_UTR_premature_start_codon_gain_variant']
-#effects = ['splice_region_variant']
-#genes = ["SSU72"]
-taxon = "NCBITaxon:9606" # homo sapien tax
+taxon = "NCBITaxon:9606"  # homo sapien tax
 driver = GraphDatabase.driver("bolt://robokopkg.renci.org:7687", auth=("neo4j", "password"))
 
 query = """
@@ -30,81 +28,95 @@ RETURN
     d.name AS GO_name
 """
 
+# Read annotations and get genes
 afile = pd.read_csv(annotation_file)
-genes = afile[afile['ann'].str.contains('|'.join(effects))]['name'].sort_values().unique() ## find all partial matches to effects and grab all unique gene names
+genes = afile[afile['ann'].str.contains('|'.join(effects))]['name'].sort_values().unique()
 
-all_results = []
-
-## for testing
+# For testing, limit to 10 genes
 genes = genes[0:10]
-gene_map = {}
+
+# Create a gene-to-id mapping file
+gene_to_id = {}
+for i, gene in enumerate(genes):
+    gene_to_id[gene] = i
+
+# Save gene2id.txt
+with open('gene2id.txt', 'w') as f:
+    for gene, gene_id in gene_to_id.items():
+        f.write(f"{gene} {gene_id}\n")
+
+# Build GO term to gene mappings
+go_term_relationships = []  # Store parent-child term relationships
+go_gene_associations = []   # Store term-gene associations
+go_term_hierarchy = {}      # Store the hierarchy for validation
+
 with driver.session() as session:
     for gene in genes:
-        print(gene)
+        print(f"Processing gene: {gene}")
         result = session.run(query, {"gene_name": gene, "taxon": taxon})
         data = [r.data() for r in result]
-#        print(data[])
-#        exit() 
-
-        ## extract a list of all goids associated with specific gene
-        goids = [dict['GO_id'] for dict in data]
-        anc=[]
+        
+        # Extract GO terms directly associated with this gene
+        goids = [d['GO_id'] for d in data]
+        
+        # Add direct gene to GO term associations
         for goid in goids:
-         #   if goid == 'GO:0008150': ## skip for root term BP
-         #       continue
-                     # Add direct gene to GO term
-            if goid not in gene_map:
-                gene_map[goid] = []
-            if gene not in gene_map[goid]:
-                gene_map[goid].append(gene)
-
-            gosubdag_r0 = GoSubDag([goid], godag, prt=None)
+            go_gene_associations.append((goid, gene, "gene"))
+            
+            # Get ancestors for this GO term
             try:
-                anc += list(gosubdag_r0.rcntobj.go2ancestors[goid])
+                gosubdag_r0 = GoSubDag([goid], godag, prt=None)
+                ancestors = list(gosubdag_r0.rcntobj.go2ancestors[goid])
+                
+                # For each ancestor, add the gene association
+                for ancestor in ancestors:
+                    go_gene_associations.append((ancestor, gene, "gene"))
+                    
+                    # Get parent-child relationships for the GO hierarchy
+                    go_obj = godag[goid]
+                    for parent in go_obj.parents:
+                        parent_id = parent.id
+                        if (parent_id, goid) not in go_term_relationships:
+                            go_term_relationships.append((parent_id, goid, "default"))
+                            
+                            # Track hierarchy for validation
+                            if parent_id not in go_term_hierarchy:
+                                go_term_hierarchy[parent_id] = []
+                            if goid not in go_term_hierarchy[parent_id]:
+                                go_term_hierarchy[parent_id].append(goid)
+                
             except KeyError:
+                print(f"Warning: Could not process GO term {goid}")
                 continue
 
-        anc = list(set(anc))
-        
-        ## loop through all the ancestor terms for gene
-        ## if the go term is not in the gene map dictionary keys add it as a key and assign gene
-        if len(anc) > 0 :
-#            all_results.append(df)
-#            for go in df['GO_id'].values:
-            for go in anc:
-                if go not in gene_map.keys():
-                    gene_map[go] = [gene]
-                else:
-                    gene_map[go].append(gene)
+# Find the root term(s)
+all_terms = set([rel[0] for rel in go_term_relationships] + [rel[1] for rel in go_term_relationships])
+child_terms = set([rel[1] for rel in go_term_relationships])
+root_terms = all_terms - child_terms
 
-with open('PGS001990/ontology.txt', 'w') as f:
-    for goid in gene_map.keys():
-        ngenes = len(gene_map[goid])
-        go_obj = godag[goid]
+# If multiple roots, create a single ROOT node
+if len(root_terms) > 1:
+    for root in root_terms:
+        go_term_relationships.append(("ROOT", root, "default"))
+elif len(root_terms) == 1:
+    root = list(root_terms)[0]
+    # Rename the single root to "ROOT" if needed
+    go_term_relationships = [("ROOT" if rel[0] == root else rel[0], 
+                             "ROOT" if rel[1] == root else rel[1], 
+                             rel[2]) for rel in go_term_relationships]
+else:
+    print("Warning: No root terms found")
 
-        # Get direct children
-        direct_children = set()
-        for child in go_obj.get_goterms_lower():
-        # Check if this is a direct child
-            if goid in [parent.id for parent in child.parents]:
-                direct_children.add(child.id) 
+# Write the ontology file in the required format
+with open('ontology.txt', 'w') as f:
+    # Write term-term relationships first
+    for parent, child, rel_type in go_term_relationships:
+        f.write(f"{parent}\t{child}\t{rel_type}\n")
+    
+    # Write term-gene associations
+    for term, gene, rel_type in go_gene_associations:
+        # Only include genes that are in our gene_to_id mapping
+        if gene in gene_to_id:
+            f.write(f"{term}\t{gene}\t{rel_type}\n")
 
-        f.write(f'ROOT: {goid} {ngenes}\n')
-        f.write(f'GENES: {' '.join(gene_map[goid])}\n')
-        f.write(f'TERMS: {' '.join(direct_children)}\n')
-
-    # Store the direct children
-#    for child in go_obj.children:
-#        child_id = child.id
-
-#        print(child_id)
-#gene_map_df = pd.DataFrame({'GOid' : gene_map.keys(), 'Genes' : gene_map.values()})
-
-#gene_map_df.to_csv('gene_map.tsv', sep = '\t',index = False)
-
-#print(gene_map_df)
-
-# Concatenate all results into one DataFrame
-#gtogo = pd.concat(all_results, ignore_index=True)
-
-#print(gtogo.head())
+print("Ontology file generated successfully")
