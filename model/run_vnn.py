@@ -33,19 +33,19 @@ def main():
     if not os.path.exists(opt.modeldir):
         os.makedirs(opt.modeldir)
     
-    if opt.optimize == 1:
-        VNNTrainer(data_wrapper).train_model()
+    #if opt.optimize == 1:
+    #    VNNTrainer(data_wrapper).train_model()
 
-    elif opt.optimize == 2:
-        trial_params = OptunaNNTrainer(data_wrapper).exec_study()
-        for key, value in trial_params.items():
-            if hasattr(data_wrapper, key):
-                setattr(data_wrapper, key, value)
-        VNNTrainer(data_wrapper).train_model()
+    #elif opt.optimize == 2:
+    #    trial_params = OptunaNNTrainer(data_wrapper).exec_study()
+    #    for key, value in trial_params.items():
+    #        if hasattr(data_wrapper, key):
+    #            setattr(data_wrapper, key, value)
+    #    VNNTrainer(data_wrapper).train_model()
 
-    else:
-        print("Wrong value for optimize.")
-        exit(1)
+    #else:
+    #    print("Wrong value for optimize.")
+    #    exit(1)
     
 if __name__ == "__main__":
 	main()
