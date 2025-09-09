@@ -21,9 +21,11 @@ class VNNTrainer():
     def train_model(self):
 
         self.model = DCellNN(self.data_wrapper)
-        self.model.cuda(self.data_wrapper.cuda)
+#        self.model.cuda(self.data_wrapper.cuda)
 
-        
+        print(self.model)
+        exit()
+
         min_loss = None
         max_corr = None
         term_mask_map = utils.create_term_mask(self.model.term_direct_gene_map, self.model.gene_dim, self.data_wrapper.cuda)

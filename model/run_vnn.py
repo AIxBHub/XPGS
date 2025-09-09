@@ -33,6 +33,7 @@ def main():
     if not os.path.exists(opt.modeldir):
         os.makedirs(opt.modeldir)
     
+    VNNTrainer(data_wrapper).train_model()
     #if opt.optimize == 1:
     #    VNNTrainer(data_wrapper).train_model()
 
