@@ -14,31 +14,36 @@ import utils
 
 
 class TrainingDataWrapper():
-    def __init__(self, args):
-        self.gene_id_mapping = utils.load_mapping(args.gene2id, 'genes')
-        self.num_hiddens_genotype = args.genotype_hiddens
-        self.min_dropout_layer = args.min_dropout_layer
-        self.dropout_fraction = args.dropout_fraction
-        self.lr = args.lr
-        self.wd = args.wd
-        self.alpha = args.alpha
-        self.epochs = args.epoch
-        self.batchsize = args.batchsize
-        self.cuda = args.cuda
-        self.modeldir = args.modeldir
-        self.delta = args.delta
-        self.load_ontology(args.onto)
+    def __init__(self, onto, g2id):
+#        self.gene_id_mapping = utils.load_mapping(args.gene2id, 'genes')
+        self.gene_id_mapping = utils.load_mapping(g2id, 'genes')
+        #self.num_hiddens_genotype = args.genotype_hiddens
+        self.num_hiddens_genotype = 50 
+        #self.min_dropout_layer = args.min_dropout_layer
+        self.min_dropout_layer = 2
+        #self.dropout_fraction = args.dropout_fraction
+        self.dropout_fraction = 0.1 
+        #self.lr = args.lr
+        #self.wd = args.wd
+        #self.alpha = args.alpha
+        #self.epochs = args.epoch
+        #self.batchsize = args.batchsize
+        #self.cuda = args.cuda
+        #self.modeldir = args.modeldir
+        #self.delta = args.delta
+#        self.load_ontology(args.onto)
+        self.load_ontology(onto)
         # Train test dataset sort out. If no test set given, use training dataset to make hold outs for test
-        self.train = args.train
-        self.test = args.test
-        self.testsetratio = args.testsetratio
+        #self.train = args.train
+        #self.test = args.test
+        #self.testsetratio = args.testsetratio
         #self.trainset, self.testset = prepare_dataloader.get_data(self.train, self.test, self.testsetratio, self.gene_id_mapping, self.batchsize)
             
             
     
-        self.optimize = args.optimize
+        #self.optimize = args.optimize
         self.strfime = time.strftime('%Y%m%d%H%M')
-        self.outfile = os.path.join(self.modeldir,  f"{self.strfime}_{args.metric_output}")
+        #self.outfile = os.path.join(self.modeldir,  f"{self.strfime}_{args.metric_output}")
 
     
     
