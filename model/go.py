@@ -53,6 +53,8 @@ def map_genes(genes, outdir):
     # Create a gene-to-id mapping file
     gene_to_id = {}
     for i, gene in enumerate(genes):
+        if ' ' in gene:
+            gene = gene.split(' ')[0]
         gene_to_id[gene] = i
 
     # Save gene2id.txt
@@ -70,7 +72,6 @@ def map_terms(driver, genes, query, taxon, godag):
 
     with driver.session() as session:
         for gene in genes:
-            print(f"Processing gene: {gene}")
             result = session.run(query, {"gene_name": gene, "taxon": taxon})
             data = [r.data() for r in result]
 

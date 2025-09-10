@@ -8,4 +8,4 @@ module load python/3.12
 
 source .venv/bin/activate
 
-python model/go.py -obo $godag -anno $annotation_file -test 2 -out PGS001990
+python model/go.py -obo $godag -anno $annotation_file -out PGS001990
