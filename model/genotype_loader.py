@@ -70,7 +70,7 @@ def loader1_spark():
         #i += 1
         
 def loader1_polars():
-    with open("../../../ukb_for_pgs/ukb_imp_bct_vars_merged_effects.vcf") as f:
+    with open("/proj/jchunglab/projects/genesight/ukb_imp_bct_vars_merged_effects.vcf") as f:
         for line in f:
             if line.startswith("#CHROM"):
                 header = line.lstrip("#").strip().split("\t")
@@ -78,7 +78,7 @@ def loader1_polars():
             
     # Load the data with the fixed header
     df = pl.scan_csv(
-        "../../../ukb_for_pgs/ukb_imp_bct_vars_merged_effects.vcf",
+        "/proj/jchunglab/projects/genesight/ukb_imp_bct_vars_merged_effects.vcf",
         has_header=False,
         new_columns=header,
         separator="\t",
@@ -112,17 +112,15 @@ def loader1_polars():
     encoded = encoded.reshape(arr.shape)
     
     # Store in parquet format for further preprocessing
-    dfgeno = pl.DataFrame(encoded)  # or pl.from_numpy(encoded)
-    dfgeno = pl.DataFrame(dfgeno, columns=columns)
-    dfgeno = dfgeno.with_columns(df["ID"].alias("rsID")
-                                 
-                                 )
+    dfgeno = pl.from_numpy(encoded)  # or pl.from_numpy(encoded)
+    dfgeno = dfgeno.rename({i: col for i, col in enumerate(columns)})
+    dfgeno = dfgeno.with_columns(df["ID"].alias("rsID"))
     
     dfgeno.write_parquet("genotypes.parquet", compression="zstd")
-    
+
     # Store in tensors for training
-    t = torch.from_numpy(encoded).to(torch.int8)  # values -1,0,1,2 fit in int8
-    torch.save(t, "genotypes.pt")
+    #t = torch.from_numpy(encoded).to(torch.int8)  # values -1,0,1,2 fit in int8
+    #torch.save(t, "genotypes.pt")
 
 
     
