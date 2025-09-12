@@ -113,7 +113,7 @@ def loader1_polars():
     
     # Store in parquet format for further preprocessing
     dfgeno = pl.from_numpy(encoded)  # or pl.from_numpy(encoded)
-    dfgeno = dfgeno.rename({i: col for i, col in enumerate(columns)})
+    dfgeno = dfgeno.rename({i: str(col) for i, col in enumerate(columns)})
     dfgeno = dfgeno.with_columns(df["ID"].alias("rsID"))
     
     dfgeno.write_parquet("genotypes.parquet", compression="zstd")
