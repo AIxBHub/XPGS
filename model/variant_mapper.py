@@ -63,6 +63,12 @@ def map_variants(genotypes, annotations, outdir):
 
     t = torch.from_numpy(arrs).to(torch.int8)
     torch.save(t, f"{outdir}/genotypes_mapped.pt")
+    print(t)
+    
+    print(f"{mapped_genes} mapped genes")
+    with open(f'{outdir}/mapped_genes.txt', 'w') as f:
+        for line in mapped_genes:
+            f.write(f"{line}\n")
 
 if __name__ == "__main__":
     genotypes = "PGS001990/genotypes.parquet"
