@@ -49,16 +49,16 @@ def loader1_polars(vcf_file, outdir):
     encoded = encoded.reshape(arr.shape)
 
     ## transpose so variants are columns
-    encoded_transposed = encoded.T
-    dfgeno = pl.DataFrame(encoded_transposed)
+#    encoded_transposed = encoded.T
+#    dfgeno = pl.DataFrame(encoded_transposed)
     ## set column names to variant ids for genotype mapping
-    dfgeno.columns = df.select('ID').collect().to_series().to_list()
+#    dfgeno.columns = df.select('ID').collect().to_series().to_list()
     # Store in parquet format for further preprocessing
-    dfgeno.write_parquet(f"{outdir}/genotypes.parquet", compression="zstd")
+#    dfgeno.write_parquet(f"{outdir}/genotypes.parquet", compression="zstd")
     dfgeno = pl.DataFrame(encoded, schema=columns[9:])  # or pl.from_numpy(encoded)
     dfgeno = dfgeno.with_columns(pl.Series("rsID", dfdata.collect()["ID"].to_list()))
     
-    dfgeno.write_parquet("genotypes.parquet", compression="zstd")
+    dfgeno.write_parquet(f"{outdir}/genotypes.parquet", compression="zstd")
 
     # Store in tensors for training
     t = torch.from_numpy(encoded).to(torch.int8)  # values -1,0,1,2 fit in int8
