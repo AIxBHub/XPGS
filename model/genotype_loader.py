@@ -85,6 +85,7 @@ def loader1_polars():
         skip_rows=38
     )
     df = df.rename({col: re.sub(r"_.*", "", col) for col in df.columns})
+    columns = df.collect_schema().names()[9:]
     df_100 = df.select(df.columns[9:100])
     
     # Select only data columns
@@ -112,8 +113,13 @@ def loader1_polars():
     
     # Store in parquet format for further preprocessing
     dfgeno = pl.DataFrame(encoded)  # or pl.from_numpy(encoded)
+    dfgeno = pl.DataFrame(dfgeno, columns=columns)
+    dfgeno = dfgeno.with_columns(df["ID"].alias("rsID")
+                                 
+                                 )
+    
     dfgeno.write_parquet("genotypes.parquet", compression="zstd")
-
+    
     # Store in tensors for training
     t = torch.from_numpy(encoded).to(torch.int8)  # values -1,0,1,2 fit in int8
     torch.save(t, "genotypes.pt")

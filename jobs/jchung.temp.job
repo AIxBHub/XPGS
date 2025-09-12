@@ -1,0 +1,17 @@
+#!/bin/bash
+#SBATCH --job-name=vnn_preprocess
+#SBATCH --time=10:00:00
+#SBATCH --cpus-per-task=8
+#SBATCH --mem=160G
+#SBATCH --mail-user=chjchung@email.unc.edu
+#SBATCH --mail-type=END
+#SBATCH --out=vnn_preprocess_%j.out
+
+export PATH="/nas/longleaf/home/chjchung/.pyenv/bin:$PATH"
+eval "$(pyenv init -)"
+eval "$(pyenv virtualenv-init -)"
+
+pyenv activate genesight
+
+echo "loader starts."
+python /proj/jchunglab/projects/genesight/gits/bct_variants/model/genotype_loader.py
