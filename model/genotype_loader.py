@@ -21,13 +21,14 @@ def loader1_polars(vcf_file, outdir):
         separator="\t",
         skip_rows=38
     )
-    df = df.rename({col: re.sub(r"_.*", "", col) for col in df.columns})
-    df_100 = df.select(df.columns[9:100])
+    df = df.rename({col: re.sub(r"_.*", "", col) for col in df.collect_schema().names()})
+    columns = df.collect_schema().names()
+    dfdata = df.select([columns[2]]+columns[9:])
     
     # Select only data columns
-    dfdata = df.select(df.columns[9:])
+    #dfdata = df.select(df.columns[9:])
     # Convert to a numpy array of strings first
-    arr = dfdata.collect().to_numpy().astype(str)
+    arr = dfdata.select(columns[9:]).collect().to_numpy().astype(str)
 
     # Replace missing genotypes "./." with "0/0"
     arr[arr == "./."] = "0/0"
@@ -54,10 +55,15 @@ def loader1_polars(vcf_file, outdir):
     dfgeno.columns = df.select('ID').collect().to_series().to_list()
     # Store in parquet format for further preprocessing
     dfgeno.write_parquet(f"{outdir}/genotypes.parquet", compression="zstd")
+    dfgeno = pl.DataFrame(encoded, schema=columns[9:])  # or pl.from_numpy(encoded)
+    dfgeno = dfgeno.with_columns(pl.Series("rsID", dfdata.collect()["ID"].to_list()))
+    
+    dfgeno.write_parquet("genotypes.parquet", compression="zstd")
 
     # Store in tensors for training
     t = torch.from_numpy(encoded).to(torch.int8)  # values -1,0,1,2 fit in int8
     torch.save(t, f"{outdir}/genotypes.pt")
+
 
 
 if __name__ == "__main__":
