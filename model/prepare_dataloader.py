@@ -1,7 +1,7 @@
-from pyspark.sql import SparkSession
-from pyspark.sql import functions as F
-from pyspark.sql.types import StructType,StructField, StringType, DoubleType
-from torch.utils.data import Dataset, DataLoader
+#from pyspark.sql import SparkSession
+#from pyspark.sql import functions as F
+#from pyspark.sql.types import StructType,StructField, StringType, DoubleType
+from torch.utils.data import Dataset, DataLoader, TensorDataset
 import torch
 import os
 
@@ -77,3 +77,15 @@ def get_data(train_file, test_file, testratio, g2imap, batchsize):
         
 
     
+def get_from_pt(train_file, test_file, batchsize):
+    
+    traindata = torch.load(train_file)
+    testdata  = torch.load(test_file)
+    
+    train_dataset = TensorDataset(traindata["X"], traindata["y"])
+    test_dataset = TensorDataset(testdata["X"], testdata["y"])
+    train_dataloader = DataLoader(train_dataset, batch_size=batchsize, shuffle=True)
+    test_dataloader = DataLoader(test_dataset, batch_size=batchsize, shuffle=False)
+    
+    return train_dataloader, test_dataloader
+        

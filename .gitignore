@@ -1,6 +1,7 @@
 # temp notebooks
 notebooks/
 
+.vscode
 .cache
 .venv
 .local

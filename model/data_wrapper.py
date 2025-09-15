@@ -6,7 +6,7 @@ import networkx.algorithms.components.connected as nxacc
 import networkx.algorithms.dag as nxadag
 import time
 import os
-
+import torch
 import utils
 
 class TrainingDataWrapper():
@@ -20,7 +20,8 @@ class TrainingDataWrapper():
         self.alpha = args.alpha
         self.epochs = args.epoch
         self.batchsize = args.batchsize
-        self.cuda = args.cuda
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.cuda = device
         self.modeldir = args.modeldir
         self.delta = args.delta
         self.load_ontology(args.onto)
@@ -54,7 +55,7 @@ class TrainingDataWrapper():
                 term_direct_gene_map[line[0]].add(self.gene_id_mapping[line[1]])
                 gene_set.add(line[1])
         file_handle.close()
-
+        empty_terms = []
         for term in dG.nodes():
             term_gene_set = set()
             if term in term_direct_gene_map:
@@ -66,10 +67,11 @@ class TrainingDataWrapper():
             # jisoo
             if len(term_gene_set) == 0:
                 print('There is empty terms, please delete term:', term)
+                empty_terms.append(term)
                 sys.exit(1)
             else:
                 term_size_map[term] = len(term_gene_set)
-                
+        print(empty_terms)        
         roots = [n for n in dG.nodes if dG.in_degree(n) == 0]
 
         uG = dG.to_undirected()
