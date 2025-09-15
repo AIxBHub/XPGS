@@ -21,7 +21,7 @@ class VNNTrainer():
     def train_model(self):
 
         self.model = DCellNN(self.data_wrapper)
-#        self.model.to(self.data_wrapper.cuda)
+        self.model.to(self.data_wrapper.cuda)
 
         #print(self.model)
         #exit()
@@ -99,27 +99,31 @@ class VNNTrainer():
             val_predict = torch.zeros(0, 0).to(self.data_wrapper.cuda)
 
             val_loss = 0
-            for i, (inputdata, labels) in enumerate(val_loader):
-                # Convert torch tensor to Variable
-                #vfeatures = utils.build_input_vector(inputdata, self.data_wrapper.gene_id_mapping)
-                vfeatures = inputdata.to(torch.float32).to(self.data_wrapper.cuda)
-                labels = labels.to(torch.float32).unsqueeze(1).to(self.data_wrapper.cuda)
+            with torch.no_grad():
+                for i, (inputdata, labels) in enumerate(val_loader):
+                    print(f"Val batch {i}")
+                    # Convert torch tensor to Variable
+                    #vfeatures = utils.build_input_vector(inputdata, self.data_wrapper.gene_id_mapping)
+                    vfeatures = inputdata.to(torch.float32).to(self.data_wrapper.cuda)
+                    labels = labels.to(torch.float32).unsqueeze(1).to(self.data_wrapper.cuda)
 
-                aux_out_map, hidden_embeddings_map = self.model(vfeatures)
+                    aux_out_map, hidden_embeddings_map = self.model(vfeatures)
 
-                if val_predict.size()[0] == 0:
-                    val_predict = aux_out_map['final'].data
-                    val_label_gpu = labels
-                else:
-                    val_predict = torch.cat([val_predict, aux_out_map['final'].data], dim=0)
-                    val_label_gpu = torch.cat([val_label_gpu, labels], dim=0)
+                    if val_predict.size()[0] == 0:
+                        val_predict = aux_out_map['final'].detach().cpu()
+                        val_label_gpu = labels.cpu()
+                    else:
+                        val_predict = torch.cat([val_predict, aux_out_map['final'].detach().cpu()], dim=0)
+                        val_label_gpu = torch.cat([val_label_gpu, labels.cpu()], dim=0)
 
-                for name, output in aux_out_map.items():
-                    #loss = CCCLoss()
-                    loss = nn.MSELoss()
-                    if name == 'final':
-                        val_loss += loss(output, labels)
+                    for name, output in aux_out_map.items():
+                        #loss = CCCLoss()
+                        loss = nn.MSELoss()
+                        if name == 'final':
+                            val_loss += loss(output, labels)
 
+                
+                
             val_corr = utils.pearson_corr(val_predict, val_label_gpu)
 
             epoch_end_time = time.time()
