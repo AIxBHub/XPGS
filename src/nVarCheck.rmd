@@ -1,0 +1,44 @@
+
+
+```{r}
+library(magrittr)
+library(ggplot2)
+anno <- read.csv("../PGS001990/ukb_imp_bct_vars_merged_clean_annotations-NodeNorm.csv")
+genes <- read.table("../PGS001990/mapped_genes.txt", col.names = c('gene'))
+genes
+
+anno %>%
+  dplyr::select(id_x, name) %>%
+  dplyr::distinct() %>%
+  dplyr::group_by(name) %>%
+  dplyr::count() %>%
+  dplyr::filter(name != "") %>%
+  ggplot(aes(n)) +
+  geom_histogram(binwidth = 1) +
+  xlim(c(0,15))
+```
+
+
+868 mapped genes
+
+```{r}
+anno %>%
+  dplyr::filter(name %in% genes$gene)
+  dplyr::select(id_x, name) %>%
+  dplyr::distinct() %>%
+  dplyr::group_by(id_x) %>% 
+  dplyr::count() %>%
+  dplyr::filter(n > 1) %>%
+  dplyr::arrange(desc(n))
+  ggplot(aes(n)) +
+  geom_histogram(binwidth = 1) 
+  xlim(c(0,25))
+```
+
+20,930 variants map to >1 genes
+
+
+```{r}
+
+```
+

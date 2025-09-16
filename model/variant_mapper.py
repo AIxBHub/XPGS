@@ -13,8 +13,8 @@ def map_variants(genotypes, annotations):
 
     variant_map = {}
     for row in anno.iter_rows(named = True):
-        #if row['id_x'] not in geno.columns:
-        #    continue
+        if row['id_x'] not in geno.columns:
+            continue
 
         if row['biotype'] != 'protein_coding':
             continue
