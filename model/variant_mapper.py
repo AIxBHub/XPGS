@@ -24,10 +24,14 @@ def map_variants(genotypes, annotations, outdir):
     variant_map = {}
     ## build a variant map that has {gene_name : [variants]}
     for row in anno.iter_rows(named = True):
-        if row['id_x'] not in geno.columns:
+        if row['id_x'] not in rs_ids:
             continue
 
         if row['biotype'] != 'protein_coding':
+            continue
+
+        effect_patterns = "|".join(['missense_variant', 'splice_region_variant', 'stop_gained'])
+        if not re.search(effect_patterns, row['ann']):
             continue
 
         gene = row['name'] if row['name'] is not None else row['gene']
@@ -49,8 +53,8 @@ def map_variants(genotypes, annotations, outdir):
     for gene, variants in variant_map.items():
         arr = np.zeros((nsamples,1), np.int8) ## empty array for n samples
         for var in variants: ## for each variant aggregate scores
-            if var in geno.columns:
-                arr += geno.select(var).to_numpy().reshape(nsamples, 1)
+#            if var in geno.columns:
+            arr += geno.select(var).to_numpy().reshape(nsamples, 1)
         ## only keep arrays where variants in the annotation file (which has unfiltered variants) where matched to variants in the processed genotype file
         ## append these aggregated gene-level arrays to list of arrays
         if np.sum(arr) > 0: 
@@ -67,10 +71,13 @@ def map_variants(genotypes, annotations, outdir):
     torch.save(t, f"{outdir}/genotypes_mapped.pt")
     print(t)
     
-    print(f"{mapped_genes} mapped genes")
     with open(f'{outdir}/mapped_genes.txt', 'w') as f:
         for line in mapped_genes:
             f.write(f"{line}\n")
+
+    with open(f'{outdir}/mapped_variants.txt', 'w') as f:
+        for id in rs_ids:
+            f.write(f"{id}\n")
 
 if __name__ == "__main__":
     genotypes = "PGS001990/genotypes.parquet"

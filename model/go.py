@@ -1,5 +1,6 @@
 from neo4j import GraphDatabase
 import pandas as pd
+import numpy as np
 from goatools.obo_parser import GODag
 from goatools.gosubdag.gosubdag import GoSubDag
 import argparse
@@ -8,7 +9,7 @@ def main():
     parser = argparse.ArgumentParser(description = 'Build ontology file')
     parser.add_argument('-obo', help = 'GO DAG file', type = str)
     parser.add_argument('-anno', help = 'Variant annotation file', type = str)
-    parser.add_argument('-eff', nargs = '+', help = 'List of effects', type = str, default = ['missense_variant','splice_region_variant','stop_gained','5_prime_UTR_premature_start_codon_gain_variant'])
+    parser.add_argument('-eff', nargs = '+', help = 'List of effects', type = str, default = ['missense_variant','splice_region_variant','stop_gained'])
     parser.add_argument('-tax', help = 'Taxon', type = str, default = 'NCBITaxon:9606')
     parser.add_argument('-kg', help = 'URL to KG', type = str, default = "bolt://robokopkg.renci.org:7687")
     parser.add_argument('-test', help = 'Test with N genes', type = int)
@@ -53,6 +54,8 @@ def map_genes(genes, outdir):
     # Create a gene-to-id mapping file
     gene_to_id = {}
     for i, gene in enumerate(genes):
+        if pd.isna(gene):
+            continue
         if ' ' in gene:
             gene = gene.split(' ')[0]
         gene_to_id[gene] = i

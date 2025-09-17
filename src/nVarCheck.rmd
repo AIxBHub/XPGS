@@ -3,9 +3,10 @@
 ```{r}
 library(magrittr)
 library(ggplot2)
-anno <- read.csv("../PGS001990/ukb_imp_bct_vars_merged_clean_annotations-NodeNorm.csv")
+anno.nn <- read.csv("../PGS001990/ukb_imp_bct_vars_merged_clean_annotations-NodeNorm.csv")
+anno <- read.csv("../PGS001990/ukb_imp_bct_vars_merged_clean_annotations.csv")
 genes <- read.table("../PGS001990/mapped_genes.txt", col.names = c('gene'))
-genes
+vars <- read.table("../PGS001990/mapped_variants.txt", col.names = c('id_x'))
 
 anno %>%
   dplyr::select(id_x, name) %>%
@@ -16,26 +17,70 @@ anno %>%
   ggplot(aes(n)) +
   geom_histogram(binwidth = 1) +
   xlim(c(0,15))
+
 ```
 
-
-868 mapped genes
+from annotated vcf file - 730 variants
 
 ```{r}
-anno %>%
-  dplyr::filter(name %in% genes$gene)
-  dplyr::select(id_x, name) %>%
-  dplyr::distinct() %>%
-  dplyr::group_by(id_x) %>% 
-  dplyr::count() %>%
-  dplyr::filter(n > 1) %>%
-  dplyr::arrange(desc(n))
-  ggplot(aes(n)) +
-  geom_histogram(binwidth = 1) 
-  xlim(c(0,25))
+length(unique(vars$id_x))
 ```
 
-20,930 variants map to >1 genes
+There are 717 annotated variants in the annotations summary file. 
+Why are 13 lost?? 13 variants in the vcf file (from mapped variants) are missing in the annotation summary file.
+
+
+```{r}
+anno[anno$id %in% vars$id_x,] %>%
+  .$id %>%
+  unique %>%
+  length()
+
+# ids missing in annotation csv file
+vars[!(vars$id_x %in% anno$id),]
+
+```
+
+
+What fraction of variants map to more than 1 gene?
+low
+
+There are 711 variants in the annotation csv after nodenorm that have desired effect annotation. 
+
+Filter nodenorm annotation to 717 matching variant set
+this gives *868* when mapping to genes. 
+805 variants map to 1 gene
+58 to 2 genes
+5 to 3 genes
+
+If you add in the effect filter then 701 variants 
+map to 663 genes, 621 map to 1 gene, 41 to 2 gene, 1 to 3 gene
+
+```{r}
+anno.nn[grepl('premature',anno.nn$an)]
+anno.nn %>%
+  dplyr::filter(grepl('missense_variant', ann) | grepl('splice_region_variant', ann) | grepl('stop_gained', ann)) %>%
+  dplyr::mutate(name = ifelse(name == "", gene, name)) %>%
+  dplyr::select(id_x, name) %>%
+  dplyr::distinct() %>%
+  dplyr::group_by(id_x) %>%
+  dplyr::count() %>%
+  dplyr::arrange(desc(n))
+
+anno.nn %>%
+  dplyr::filter(grepl('missense_variant', ann) | grepl('splice_region_variant', ann) | grepl('stop_gained', ann)) %>%
+  dplyr::filter(id_x %in% vars$id_x) %>%
+  #.$id_x %>% unique() %>% length()
+  dplyr::mutate(name = ifelse(name == "", gene, name)) %>%
+  dplyr::select(id_x, name) %>%
+  dplyr::distinct() %>%
+  dplyr::group_by(name) %>%
+  dplyr::count() %>%
+  dplyr::group_by(n) %>%
+  dplyr::count()
+  dplyr::filter(n > 1)
+  
+```
 
 
 ```{r}
