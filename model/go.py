@@ -1,6 +1,5 @@
 from neo4j import GraphDatabase
 import pandas as pd
-import numpy as np
 from goatools.obo_parser import GODag
 from goatools.gosubdag.gosubdag import GoSubDag
 import argparse
@@ -9,7 +8,7 @@ def main():
     parser = argparse.ArgumentParser(description = 'Build ontology file')
     parser.add_argument('-obo', help = 'GO DAG file', type = str)
     parser.add_argument('-anno', help = 'Variant annotation file', type = str)
-    parser.add_argument('-eff', nargs = '+', help = 'List of effects', type = str, default = ['missense_variant','splice_region_variant','stop_gained'])
+    parser.add_argument('-eff', nargs = '+', help = 'List of effects', type = str, default = ['missense_variant','splice_region_variant','stop_gained','5_prime_UTR_premature_start_codon_gain_variant'])
     parser.add_argument('-tax', help = 'Taxon', type = str, default = 'NCBITaxon:9606')
     parser.add_argument('-kg', help = 'URL to KG', type = str, default = "bolt://robokopkg.renci.org:7687")
     parser.add_argument('-test', help = 'Test with N genes', type = int)
@@ -68,10 +67,11 @@ def map_genes(genes, outdir):
     return gene_to_id
 
 def map_terms(driver, genes, query, taxon, godag):
-    # Build GO term to gene mappings
-    go_term_relationships = []  # Store parent-child term relationships
-    go_gene_associations = []   # Store term-gene associations
-    go_term_hierarchy = {}      # Store the hierarchy for validation
+    # Build GO term to gene mappings using sets to avoid duplicates
+    go_term_relationships = set()  # Store parent-child term relationships
+    go_gene_associations = set()   # Store term-gene associations
+    go_term_hierarchy = {}         # Store the hierarchy for validation
+    processed_terms = set()        # Track processed GO terms to avoid duplicate hierarchy processing
 
     with driver.session() as session:
         for gene in genes:
@@ -83,7 +83,7 @@ def map_terms(driver, genes, query, taxon, godag):
 
             # Add direct gene to GO term associations
             for goid in goids:
-                go_gene_associations.append((goid, gene, "gene"))
+                go_gene_associations.add((goid, gene, "gene"))
 
                 # Get ancestors for this GO term
                 try:
@@ -92,26 +92,30 @@ def map_terms(driver, genes, query, taxon, godag):
 
                     # For each ancestor, add the gene association
                     for ancestor in ancestors:
-                        go_gene_associations.append((ancestor, gene, "gene"))
+                        go_gene_associations.add((ancestor, gene, "gene"))
 
+                    # Process parent-child relationships only once per GO term
+                    if goid not in processed_terms:
                         # Get parent-child relationships for the GO hierarchy
                         go_obj = godag[goid]
                         for parent in go_obj.parents:
                             parent_id = parent.id
-                            if (parent_id, goid) not in go_term_relationships:
-                                go_term_relationships.append((parent_id, goid, "default"))
+                            go_term_relationships.add((parent_id, goid, "default"))
 
-                                # Track hierarchy for validation
-                                if parent_id not in go_term_hierarchy:
-                                    go_term_hierarchy[parent_id] = []
-                                if goid not in go_term_hierarchy[parent_id]:
-                                    go_term_hierarchy[parent_id].append(goid)
+                            # Track hierarchy for validation
+                            if parent_id not in go_term_hierarchy:
+                                go_term_hierarchy[parent_id] = []
+                            if goid not in go_term_hierarchy[parent_id]:
+                                go_term_hierarchy[parent_id].append(goid)
+                        
+                        processed_terms.add(goid)
 
                 except KeyError:
                     print(f"Warning: Could not process GO term {goid}")
                     continue
 
-    return go_term_relationships, go_term_hierarchy, go_gene_associations
+    # Convert sets back to lists for compatibility with the rest of the code
+    return list(go_term_relationships), go_term_hierarchy, list(go_gene_associations)
 
 def find_root(go_term_relationships):
     # Find the root term(s)
