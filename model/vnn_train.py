@@ -9,6 +9,7 @@ from torch.autograd import Variable
 import utils
 import prepare_dataloader
 from dcell_nn import DCellNN
+from bb_nn import blackbox
 from ccc_loss import *
 import os
 
@@ -20,7 +21,10 @@ class VNNTrainer():
 
     def train_model(self):
 
-        self.model = DCellNN(self.data_wrapper)
+        if self.data_wrapper.vnn: 
+            self.model = DCellNN(self.data_wrapper)## model build with GO ontology processed in data_wrapper
+        else:
+            self.model = blackbox(self.data_wrapper) ## build with fully connected "black box"
 #        self.model.cuda(self.data_wrapper.cuda)
 
         print(self.model)

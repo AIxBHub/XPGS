@@ -22,3 +22,4 @@ tmp-data
 PGS*
 __pycache__
 test
+model_inputs

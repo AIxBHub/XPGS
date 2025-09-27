@@ -11,6 +11,8 @@ import utils
 
 class TrainingDataWrapper():
     def __init__(self, args):
+        self.vnn = True if not args.black_box else False ## adding meta for model type when black box testing
+        self.hidden_layers = args.hidden_layers
         self.gene_id_mapping = utils.load_mapping(args.gene2id, 'genes')
         self.num_hiddens_genotype = args.genotype_hiddens
         self.min_dropout_layer = args.min_dropout_layer
@@ -23,7 +25,10 @@ class TrainingDataWrapper():
         self.cuda = args.cuda
         self.modeldir = args.modeldir
         self.delta = args.delta
-        self.load_ontology(args.onto)
+
+        ## conditional to build with black box and skip ontology build
+        self.load_ontology(args.onto) if self.vnn else print('building with black box!')
+
         # Train test dataset sort out. If no test set given, use training dataset to make hold outs for test
         self.train = args.train
         self.test = args.test

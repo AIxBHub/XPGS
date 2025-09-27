@@ -27,6 +27,8 @@ def main():
     parser.add_argument('-testsetratio', help = 'Assign test set ratio from training dataset if no test set given', type = float, default = 0.2)
     parser.add_argument('-test', help = 'Test dataset', type = str)
     parser.add_argument('-metric_output', help = 'Output table with loss and metrics every epoch', type=str, default="metrics_output.tsv")
+    parser.add_argument('-black_box', help = 'Optional setting to train with fully connected ANN', type=bool, default=False)
+    parser.add_argument('-hidden_layers', default = 10)
     opt = parser.parse_args()
     data_wrapper = TrainingDataWrapper(opt)
     

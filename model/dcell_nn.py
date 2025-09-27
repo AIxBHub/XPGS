@@ -8,54 +8,115 @@ import torch.nn.functional as F
 
 class DCellNN(nn.Module):
 
-    def __init__(self, 
-                 data_wrapper, 
-                 hidden_layers = 10, 
-                 dropout_fraction = 0.1,
-                 activation_fn = 'tanh'):
+    def __init__(self, data_wrapper):
 
         super().__init__()
-        self.activation_fn = activation_fn
+
         self.root = data_wrapper.root
+        self.num_hiddens_genotype = data_wrapper.num_hiddens_genotype
+
         # input size map initiation
         self.input_size_map = {}
+
+        # dictionary from terms to genes directly annotated with the term
+        self.term_direct_gene_map = data_wrapper.term_direct_gene_map
+
         # Dropout Params
         self.min_dropout_layer = data_wrapper.min_dropout_layer
         self.dropout_fraction = data_wrapper.dropout_fraction
+
+        # calculate the number of values in a state (term): term_size_map is the number of all genes annotated with the term
+        self.cal_term_dim(data_wrapper.term_size_map)
+
+
 
         # This map is still missing. Need a function to get it from input file. This map needs to include genes from train AND test sets.
         self.gene_id_mapping = data_wrapper.gene_id_mapping  
         # ngenes, gene_dim are the number of all genes
         self.gene_dim = len(self.gene_id_mapping)
 
-        self.layers = nn.ModuleList()
-
-        ## input layer
-        first_hidden_size = self.gene_dim * 0.5 ## first hidden 50% of input
-        self.layers.append(
-            nn.Squential(
-                nn.Linear(self.gene_dim, first_hidden_size),
-                nn.BatchNorm1d(first_hidden_size),
-                nn.Dropout(p = dropout_fraction)
-        ))
-
-        ## hidden layers
-        hidden_size = first_hidden_size
-        while hidden_size >= 4:
-            for layer in hidden_layers:
-                self.layers.append(
-                    nn.Squential(
-                        nn.Linear(hidden_size, hidden_size * 0.5),
-                        nn.BatchNorm1d(hidden_size * 0.5),
-                        nn.Dropout(p = dropout_fraction) 
-                ))
-            hidden_size = hidden_size * 0.5
+        # add modules for neural networks to process genotypes
+        self.contruct_direct_gene_layer()
+        self.construct_NN_graph(copy.deepcopy(data_wrapper.dG))
 
         # add module for final layer
-#        self.add_module('final_aux_linear_layer', nn.Linear(data_wrapper.num_hiddens_genotype, 1))
-        self.output_layer(, 1))
+        self.add_module('final_aux_linear_layer', nn.Linear(data_wrapper.num_hiddens_genotype, 1))
+        self.add_module('final_linear_layer_output', nn.Linear(1, 1))
 
         
+
+    # calculate the number of values in a state (term)
+    def cal_term_dim(self, term_size_map):
+
+        self.term_dim_map = {}
+
+        for term, term_size in term_size_map.items():
+            num_output = self.num_hiddens_genotype
+
+            # log the number of hidden variables per each term
+            num_output = int(num_output)
+            self.term_dim_map[term] = num_output
+            # Try another hidden layer
+
+    # build a layer for forwarding gene that are directly annotated with the term
+    def contruct_direct_gene_layer(self):
+
+        for term, gene_set in self.term_direct_gene_map.items():
+            if len(gene_set) == 0:
+                print('There are no directed asscoiated genes for', term)
+                sys.exit(1)
+
+            # if there are some genes directly annotated with the term, add a layer taking in all genes and forwarding out only those genes
+            self.add_module(term+'_direct_gene_layer', nn.Linear(self.gene_dim, len(gene_set)))
+
+
+    # start from bottom (leaves), and start building a neural network using the given ontology
+    # adding modules --- the modules are not connected yet
+    def construct_NN_graph(self, dG):
+
+        self.term_layer_list = []   # term_layer_list stores the built neural network
+        self.term_neighbor_map = {}
+
+        # term_neighbor_map records all children of each term
+        for term in dG.nodes():
+            self.term_neighbor_map[term] = []
+            for child in dG.neighbors(term):
+                self.term_neighbor_map[term].append(child)
+
+        i = 0
+        while True:
+            leaves = [n for n in dG.nodes() if dG.out_degree(n) == 0]
+
+            if len(leaves) == 0:
+                break
+
+            self.term_layer_list.append(leaves)
+
+            for term in leaves:
+
+                # input size will be #chilren + #genes directly annotated by the term
+                input_size = 0
+
+                for child in self.term_neighbor_map[term]:
+                    input_size += self.term_dim_map[child]
+
+                if term in self.term_direct_gene_map:
+                    input_size += len(self.term_direct_gene_map[term])
+                self.input_size_map[term] = input_size
+                # term_hidden is the number of the hidden variables in each state
+                term_hidden = self.term_dim_map[term]
+
+                if i >= self.min_dropout_layer:
+                    self.add_module(term + '_dropout_layer', nn.Dropout(p = self.dropout_fraction))
+                self.add_module(term + '_linear_layer', nn.Linear(input_size, term_hidden))
+                self.add_module(term + '_batchnorm_layer', nn.BatchNorm1d(term_hidden))
+                self.add_module(term + '_aux_linear_layer1', nn.Linear(term_hidden, 1))
+                self.add_module(term + '_aux_linear_layer2', nn.Linear(1, 1))
+
+            i += 1
+            dG.remove_nodes_from(leaves)
+
+
     # definition of forward function
     def forward(self, gene_input):
 
