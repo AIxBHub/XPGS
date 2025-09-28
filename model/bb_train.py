@@ -89,11 +89,11 @@ class ANNTrainer():
             self.model.cuda(self.data_wrapper.cuda)
 
         # Get data loaders
-        train_loader, val_loader = prepare_dataloader.get_data(
+        train_loader, val_loader = prepare_dataloader.get_from_pt(
             self.data_wrapper.train,
             self.data_wrapper.test,
-            self.data_wrapper.testsetratio,
-            self.data_wrapper.gene_id_mapping,
+#            self.data_wrapper.testsetratio,
+#            self.data_wrapper.gene_id_mapping,
             self.data_wrapper.batchsize
         )
 
