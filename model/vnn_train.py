@@ -21,14 +21,8 @@ class VNNTrainer():
 
     def train_model(self):
 
-        if self.data_wrapper.vnn: 
-            self.model = DCellNN(self.data_wrapper)## model build with GO ontology processed in data_wrapper
-        else:
-            self.model = blackbox(self.data_wrapper) ## build with fully connected "black box"
+        self.model = DCellNN(self.data_wrapper)## model build with GO ontology processed in data_wrapper
 #        self.model.cuda(self.data_wrapper.cuda)
-
-        print(self.model)
-        exit()
 
         min_loss = None
         max_corr = None

@@ -3,6 +3,7 @@ import copy
 import os
 from data_wrapper import TrainingDataWrapper
 from vnn_train import VNNTrainer
+from bb_train import ANNTrainer
 
 def main():
     #torch.set_printoptions(precision = 5)
@@ -34,8 +35,11 @@ def main():
     
     if not os.path.exists(opt.modeldir):
         os.makedirs(opt.modeldir)
-    
-    VNNTrainer(data_wrapper).train_model()
+
+    if not opt.black_box: 
+        VNNTrainer(data_wrapper).train_model()
+    else:
+        ANNTrainer(data_wrapper).train_model()
     #if opt.optimize == 1:
     #    VNNTrainer(data_wrapper).train_model()
 
