@@ -21,8 +21,11 @@ class VNNTrainer():
 
     def train_model(self):
 
-        self.model = DCellNN(self.data_wrapper)## model build with GO ontology processed in data_wrapper
-#        self.model.cuda(self.data_wrapper.cuda)
+        self.model = DCellNN(self.data_wrapper)
+        self.model.to(self.data_wrapper.cuda)
+
+        #print(self.model)
+        #exit()
 
         min_loss = None
         max_corr = None
@@ -34,8 +37,8 @@ class VNNTrainer():
             else:
                 param.data = param.data #* 0.1
 
-        train_loader, val_loader = prepare_dataloader.get_data(self.data_wrapper.train, self.data_wrapper.test, self.data_wrapper.testsetratio, self.data_wrapper.gene_id_mapping, self.data_wrapper.batchsize)
-
+        #train_loader, val_loader = prepare_dataloader.get_data(self.data_wrapper.train, self.data_wrapper.test, self.data_wrapper.testsetratio, self.data_wrapper.gene_id_mapping, self.data_wrapper.batchsize)
+        train_loader, val_loader = prepare_dataloader.get_from_pt(self.data_wrapper.train, self.data_wrapper.test, self.data_wrapper.batchsize)
         optimizer = torch.optim.AdamW(self.model.parameters(), lr=self.data_wrapper.lr, betas=(0.9, 0.99), eps=1e-05, weight_decay=self.data_wrapper.wd)
         optimizer.zero_grad()
 
@@ -47,14 +50,14 @@ class VNNTrainer():
         for epoch in range(self.data_wrapper.epochs):
             # Train
             self.model.train()
-            train_predict = torch.zeros(0, 0).cuda(self.data_wrapper.cuda)
-            _gradnorms = torch.empty(len(train_loader)).cuda(self.data_wrapper.cuda) # tensor for accumulating grad norms from each batch in this epoch
+            train_predict = torch.zeros(0, 0).to(self.data_wrapper.cuda)
+            _gradnorms = torch.empty(len(train_loader)).to(self.data_wrapper.cuda) # tensor for accumulating grad norms from each batch in this epoch
 
             for i, (inputdata, labels) in enumerate(train_loader):
                 # Convert torch tensor to Variable
-                features = utils.build_input_vector(inputdata, self.data_wrapper.gene_id_mapping)
-                features = features.to(torch.float32).cuda(self.data_wrapper.cuda)
-                labels = labels.to(torch.float32).unsqueeze(1).cuda(self.data_wrapper.cuda)
+                #features = utils.build_input_vector(inputdata, self.data_wrapper.gene_id_mapping)
+                features = inputdata.to(torch.float32).to(self.data_wrapper.cuda)
+                labels = labels.to(torch.float32).unsqueeze(1).to(self.data_wrapper.cuda)
 
                 # Forward + Backward + Optimize
                 optimizer.zero_grad()  # zero the gradient buffer
@@ -83,7 +86,8 @@ class VNNTrainer():
                     if '_direct_gene_layer.weight' not in name:
                         continue
                     term_name = name.split('_')[0]
-                    param.grad.data = torch.mul(param.grad.data, term_mask_map[term_name])
+                    if param.grad is not None:
+                        param.grad.data = torch.mul(param.grad.data, term_mask_map[term_name])
 
                 #_gradnorms[i] = utils.get_grad_norm(self.model.parameters(), 2.0).unsqueeze(0) # Save gradnorm for batch
                 optimizer.step()
@@ -93,30 +97,34 @@ class VNNTrainer():
 
             self.model.eval()
 
-            val_predict = torch.zeros(0, 0).cuda(self.data_wrapper.cuda)
+            val_predict = torch.zeros(0, 0).to(self.data_wrapper.cuda)
 
             val_loss = 0
-            for i, (inputdata, labels) in enumerate(val_loader):
-                # Convert torch tensor to Variable
-                vfeatures = utils.build_input_vector(inputdata, self.data_wrapper.gene_id_mapping)
-                vfeatures = vfeatures.to(torch.float32).cuda(self.data_wrapper.cuda)
-                labels = labels.to(torch.float32).unsqueeze(1).cuda(self.data_wrapper.cuda)
+            with torch.no_grad():
+                for i, (inputdata, labels) in enumerate(val_loader):
+                    print(f"Val batch {i}")
+                    # Convert torch tensor to Variable
+                    #vfeatures = utils.build_input_vector(inputdata, self.data_wrapper.gene_id_mapping)
+                    vfeatures = inputdata.to(torch.float32).to(self.data_wrapper.cuda)
+                    labels = labels.to(torch.float32).unsqueeze(1).to(self.data_wrapper.cuda)
 
-                aux_out_map, hidden_embeddings_map = self.model(vfeatures)
+                    aux_out_map, hidden_embeddings_map = self.model(vfeatures)
 
-                if val_predict.size()[0] == 0:
-                    val_predict = aux_out_map['final'].data
-                    val_label_gpu = labels
-                else:
-                    val_predict = torch.cat([val_predict, aux_out_map['final'].data], dim=0)
-                    val_label_gpu = torch.cat([val_label_gpu, labels], dim=0)
+                    if val_predict.size()[0] == 0:
+                        val_predict = aux_out_map['final'].detach().cpu()
+                        val_label_gpu = labels.cpu()
+                    else:
+                        val_predict = torch.cat([val_predict, aux_out_map['final'].detach().cpu()], dim=0)
+                        val_label_gpu = torch.cat([val_label_gpu, labels.cpu()], dim=0)
 
-                for name, output in aux_out_map.items():
-                    #loss = CCCLoss()
-                    loss = nn.MSELoss()
-                    if name == 'final':
-                        val_loss += loss(output, labels)
+                    for name, output in aux_out_map.items():
+                        #loss = CCCLoss()
+                        loss = nn.MSELoss()
+                        if name == 'final':
+                            val_loss += loss(output, labels)
 
+                
+                
             val_corr = utils.pearson_corr(val_predict, val_label_gpu)
 
             epoch_end_time = time.time()

@@ -16,7 +16,7 @@ def load_mapping(mapping_file, mapping_type):
 def create_term_mask(term_direct_gene_map, gene_dim, cuda_id):
     term_mask_map = {}
     for term, gene_set in term_direct_gene_map.items():
-        mask = torch.zeros(len(gene_set), gene_dim, requires_grad=False).cuda(cuda_id)
+        mask = torch.zeros(len(gene_set), gene_dim, requires_grad=False).to(cuda_id)
         for i, gene_id in enumerate(gene_set):
             mask[i, gene_id] = 1
         term_mask_map[term] = mask
