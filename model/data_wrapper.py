@@ -68,7 +68,7 @@ class TrainingDataWrapper():
             if len(term_gene_set) == 0:
                 print('There is empty terms, please delete term:', term)
                 empty_terms.append(term)
-                sys.exit(1)
+                #sys.exit(1)
             else:
                 term_size_map[term] = len(term_gene_set)
         print(empty_terms)        

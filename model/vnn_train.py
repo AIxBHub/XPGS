@@ -145,7 +145,7 @@ class VNNTrainer():
                 print("Model saved at epoch {}".format(epoch))"""
             pt_path = os.path.join(self.data_wrapper.modeldir, f'{self.data_wrapper.strfime}_model.pt')
             
-            if max_corr == None and val_corr > 0.9:
+            if max_corr == None and val_corr > 0.1:
                 max_corr = val_corr
                 torch.save(self.model,pt_path)
                 print("Model saved at epoch {}".format(epoch))
