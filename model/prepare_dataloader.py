@@ -77,7 +77,7 @@ def get_data(train_file, test_file, testratio, g2imap, batchsize):
         
 
     
-def get_from_pt(train_file, test_file, batchsize, subset):
+def get_from_pt(train_file, test_file, batchsize, subset = None):
     
     traindata = torch.load(train_file)
     testdata  = torch.load(test_file)

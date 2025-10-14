@@ -38,7 +38,11 @@ class VNNTrainer():
                 param.data = param.data #* 0.1
 
         #train_loader, val_loader = prepare_dataloader.get_data(self.data_wrapper.train, self.data_wrapper.test, self.data_wrapper.testsetratio, self.data_wrapper.gene_id_mapping, self.data_wrapper.batchsize)
-        train_loader, val_loader = prepare_dataloader.get_from_pt(self.data_wrapper.train, self.data_wrapper.test, self.data_wrapper.batchsize)
+        train_loader, val_loader = prepare_dataloader.get_from_pt(self.data_wrapper.train, 
+                                                                  self.data_wrapper.test, 
+                                                                  self.data_wrapper.batchsize,
+                                                                  self.data_wrapper.subset)
+
         optimizer = torch.optim.AdamW(self.model.parameters(), lr=self.data_wrapper.lr, betas=(0.9, 0.99), eps=1e-05, weight_decay=self.data_wrapper.wd)
         optimizer.zero_grad()
 

@@ -24,3 +24,5 @@ PGS*
 __pycache__
 test
 model_inputs
+MODEL*
+*.out

@@ -15,12 +15,13 @@ source .venv/bin/activate
 g2id="/proj/jchunglab/projects/genesight/bct_on_pgs/PGS001990/filtered/filtered_gene2id.txt"
 train="/proj/jchunglab/projects/genesight/bct_on_pgs/PGS001990/filtered/train.pt"
 test="/proj/jchunglab/projects/genesight/bct_on_pgs/PGS001990/filtered/test.pt"
+onto="/proj/jchunglab/projects/genesight/bct_on_pgs/PGS001990/filtered/filtered_ontology.txt"
 
 python model/run_vnn.py \
     -gene2id $g2id \
     -train $train \
     -test $test \
-    -black_box True \
-    -hidden_layers 10 \
-    -lr 0.01 \
-    -batchsize 200
+    -onto $onto \
+    -modeldir MODEL_VNN \
+    -epoch 5 \
+    -subset 1000
