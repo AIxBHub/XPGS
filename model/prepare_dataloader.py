@@ -1,7 +1,7 @@
 from pyspark.sql import SparkSession
 #from pyspark.sql import functions as F
 from pyspark.sql.types import StructType,StructField, StringType, DoubleType
-from torch.utils.data import Dataset, DataLoader, TensorDataset
+from torch.utils.data import Dataset, DataLoader, TensorDataset, Subset
 import torch
 import os
 
@@ -77,13 +77,18 @@ def get_data(train_file, test_file, testratio, g2imap, batchsize):
         
 
     
-def get_from_pt(train_file, test_file, batchsize):
+def get_from_pt(train_file, test_file, batchsize, subset):
     
     traindata = torch.load(train_file)
     testdata  = torch.load(test_file)
-    
-    train_dataset = TensorDataset(traindata["X"], traindata["y"])
+
+    train_dataset = TensorDataset(traindata["X"], traindata["y"]) ## 'X' processed genotypes, 'y' MCV targets
     test_dataset = TensorDataset(testdata["X"], testdata["y"])
+    ## optional subsetting for testing
+    if subset is not None:
+        train_dataset = Subset(train_dataset, list(range(0,subset)))
+        test_dataset = Subset(test_dataset, list(range(0,subset)))
+
     train_dataloader = DataLoader(train_dataset, batch_size=batchsize, shuffle=True)
     test_dataloader = DataLoader(test_dataset, batch_size=batchsize, shuffle=False)
     

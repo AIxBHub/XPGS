@@ -24,25 +24,25 @@ class blackbox(nn.Module):
 
         ## input layer
         first_input_layer = self.gene_dim
-        print(first_input_layer)
+        hidden = first_input_layer ## temp testing without layer size reduction
         self.layers.append(nn.Sequential(
-            nn.Linear(first_input_layer, int(first_input_layer * 0.5)),
-            nn.BatchNorm1d(int(first_input_layer * 0.5)),
+            nn.Linear(first_input_layer, hidden),
+            nn.BatchNorm1d(hidden),
             nn.Dropout(self.dropout_fraction)
         ))
 
         ## add hidden layers
-        hidden = int(first_input_layer * 0.5)
+#        hidden = int(first_input_layer * 0.5)
         for l in range(data_wrapper.hidden_layers):
-            next_hidden = int(hidden * 0.5)
-            while hidden >= 4:
-                self.layers.append(nn.Sequential(
-                    nn.Linear(hidden, next_hidden),
-                    nn.BatchNorm1d(next_hidden),
-                    nn.Dropout(self.dropout_fraction)
-                ))
-                hidden = next_hidden 
-                next_hidden = int(hidden * 0.5)
+#            next_hidden = int(hidden * 0.5)
+#            while hidden >= 4:
+            self.layers.append(nn.Sequential(
+                nn.Linear(hidden, hidden),
+                nn.BatchNorm1d(hidden),
+                nn.Dropout(self.dropout_fraction)
+            ))
+#            hidden = next_hidden 
+#            next_hidden = int(hidden * 0.5)
 
         self.output_layer = nn.Linear(hidden, 1)
         # add module for final layer

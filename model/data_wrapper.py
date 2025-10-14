@@ -26,6 +26,7 @@ class TrainingDataWrapper():
         self.cuda = device
         self.modeldir = args.modeldir
         self.delta = args.delta
+        self.subset = args.subset
 
         ## conditional to build with black box and skip ontology build
         self.load_ontology(args.onto) if self.vnn else print('building with black box!')
