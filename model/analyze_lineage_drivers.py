@@ -43,9 +43,26 @@ def load_model_and_data(model_path, data_wrapper):
     model = DCellNN(data_wrapper)
 
     checkpoint = torch.load(model_path, map_location=data_wrapper.cuda)
-    model.load_state_dict(checkpoint['model_state_dict'])
-    model.eval()
 
+    # Handle different save formats
+    if isinstance(checkpoint, dict):
+        # Saved as {'model_state_dict': ..., 'epoch': ..., etc}
+        if 'model_state_dict' in checkpoint:
+            model.load_state_dict(checkpoint['model_state_dict'])
+        elif 'state_dict' in checkpoint:
+            model.load_state_dict(checkpoint['state_dict'])
+        else:
+            # Dict but no standard key, assume the dict itself is state_dict
+            model.load_state_dict(checkpoint)
+    else:
+        # Saved directly as model object (older format)
+        # checkpoint is already the model, just return it
+        print("Model was saved as object, using loaded model directly")
+        model = checkpoint
+        model.eval()
+        return model
+
+    model.eval()
     print(f"Model loaded successfully")
     return model
 

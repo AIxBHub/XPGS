@@ -17,6 +17,18 @@ After fixing Problem 1, got error:
 TypeError: DCellNN.__init__() got an unexpected keyword argument 'term_size_map'
 ```
 
+## Problem 3: Model Loading Format
+
+After fixing Problems 1 and 2, got error:
+```
+TypeError: 'DCellNN' object is not subscriptable
+```
+
+This occurred on the line:
+```python
+model.load_state_dict(checkpoint['model_state_dict'])
+```
+
 ## Root Cause 1: Missing Attributes
 
 The `MinimalArgs` class only provided a subset of attributes required by `TrainingDataWrapper.__init__()`:
@@ -55,6 +67,23 @@ But `DCellNN.__init__()` actually expects a **single `data_wrapper` object**:
 ```python
 def __init__(self, data_wrapper):
     # ...
+```
+
+## Root Cause 3: Model Save Format
+
+The VNN training code saves the model as a **complete object**, not as a state dictionary:
+
+```python
+# From vnn_train.py line 318, 324:
+torch.save(self.model, pt_path)
+```
+
+This means the saved `.pt` file contains the entire `DCellNN` object, not a dict with `'model_state_dict'` key.
+
+The original code assumed state dict format:
+```python
+checkpoint = torch.load(model_path)
+model.load_state_dict(checkpoint['model_state_dict'])  # FAILS! checkpoint is the model itself
 ```
 
 ## Solution 1: Add All Required Attributes
@@ -96,7 +125,11 @@ class MinimalArgs:
 
 ## Solution 2: Fix DCellNN Constructor Call
 
-Changed from passing individual parameters to passing the data_wrapper object:
+Changed from passing individual parameters to passing the data_wrapper object.
+
+## Solution 3: Handle Multiple Model Save Formats
+
+Updated the model loading to handle both state dict and full object saves:
 
 ```python
 def load_model_and_data(model_path, data_wrapper):
@@ -107,11 +140,34 @@ def load_model_and_data(model_path, data_wrapper):
     model = DCellNN(data_wrapper)
 
     checkpoint = torch.load(model_path, map_location=data_wrapper.cuda)
-    model.load_state_dict(checkpoint['model_state_dict'])
-    model.eval()
 
+    # Handle different save formats
+    if isinstance(checkpoint, dict):
+        # Saved as {'model_state_dict': ..., 'epoch': ..., etc}
+        if 'model_state_dict' in checkpoint:
+            model.load_state_dict(checkpoint['model_state_dict'])
+        elif 'state_dict' in checkpoint:
+            model.load_state_dict(checkpoint['state_dict'])
+        else:
+            # Dict but no standard key, assume the dict itself is state_dict
+            model.load_state_dict(checkpoint)
+    else:
+        # Saved directly as model object (VNN default format)
+        # checkpoint is already the model, just return it
+        print("Model was saved as object, using loaded model directly")
+        model = checkpoint
+        model.eval()
+        return model
+
+    model.eval()
+    print(f"Model loaded successfully")
     return model
 ```
+
+This handles:
+1. **State dict format**: `{'model_state_dict': ...}` or `{'state_dict': ...}`
+2. **Full object format**: `torch.save(model, path)` (VNN default)
+3. **Plain dict format**: State dict saved directly as dict
 
 ## Why Dummy Values Are OK
 
@@ -129,7 +185,7 @@ The training hyperparameters and output configuration are **NOT** used because:
 
 - **[analyze_lineage_drivers.py](analyze_lineage_drivers.py)**
   - Lines 378-409: Added all required attributes to MinimalArgs
-  - Lines 38-50: Fixed DCellNN constructor call
+  - Lines 38-67: Fixed DCellNN constructor call and model loading
 
 ## Verification
 
