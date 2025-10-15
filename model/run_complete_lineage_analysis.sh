@@ -23,11 +23,11 @@ echo ""
 # ============================================================================
 
 # Input files (REQUIRED - update these paths!)
-MODEL="results/model.pt"
-ONTOLOGY="data/ontology.txt"
-GENE2ID="data/gene2id.txt"
-TEST_DATA="data/test.pt"
-OBO_FILE="data/go-basic.obo"  # Optional, for readable term names
+MODEL="/workspace/data/vnn/MODEL/202510150124_model.pt"
+ONTOLOGY="/workspace/data/vnn/filtered/filtered_ontology.txt"
+GENE2ID="/workspace/data/vnn/filtered/filtered_gene2id.txt"
+TEST_DATA="/workspace/data/vnn/filtered/test.pt"
+OBO_FILE="/workspace/data/vnn/filtered/go-basic.obo"  # Optional, for readable term names
 
 # Model parameters (must match training configuration)
 GENOTYPE_HIDDENS=6
