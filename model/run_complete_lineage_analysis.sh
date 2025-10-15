@@ -81,6 +81,15 @@ echo "-------------------------------------------------------------------"
 
 LINEAGES_PREFIX="$OUTPUT_DIR/lineages"
 
+# Check if OBO file exists for term names
+OBO_PARAM=""
+if [ -f "$OBO_FILE" ]; then
+    OBO_PARAM="-obo $OBO_FILE"
+    echo "Using GO term names from: $OBO_FILE"
+else
+    echo "Warning: OBO file not found, will use GO IDs"
+fi
+
 python analyze_rlipp_lineages.py \
     -rlipp "$RLIPP_OUTPUT" \
     -onto "$ONTOLOGY" \
@@ -89,7 +98,8 @@ python analyze_rlipp_lineages.py \
     -top_n $TOP_LINEAGES_TO_FIND \
     -min_consistency $MIN_CONSISTENCY \
     -min_length 2 \
-    -visualize_top 5
+    -visualize_top 5 \
+    $OBO_PARAM
 
 echo "✓ Lineage analysis complete"
 echo "  - Positive lineages: ${LINEAGES_PREFIX}_positive.tsv"

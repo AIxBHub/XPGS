@@ -125,11 +125,11 @@ def plot_lineage_network(lineage_path, rlipp_dict, graph, output_file,
         size = 300 + abs(rlipp) * 2000
         node_sizes.append(size)
 
-        # Label with name or ID
+        # Label with FULL name (no truncation)
         if name_dict:
-            label = get_term_name(node, name_dict, max_length=20)
+            label = get_term_name(node, name_dict, max_length=None)  # No truncation
         else:
-            label = node[:15] if len(node) > 15 else node
+            label = node  # Show full GO ID
         node_labels[node] = label
 
     # Create figure
@@ -169,11 +169,11 @@ def plot_lineage_network(lineage_path, rlipp_dict, graph, output_file,
         ax=ax
     )
 
-    # Draw labels
+    # Draw labels with larger font
     nx.draw_networkx_labels(
         subgraph, pos,
         labels=node_labels,
-        font_size=9,
+        font_size=14,  # Increased from 9 to 14
         font_weight='bold',
         ax=ax
     )
@@ -241,14 +241,15 @@ def plot_multiple_lineages_combined(top_lineages, rlipp_dict, graph, output_file
         size = 300 + abs(rlipp) * 1500
         node_sizes.append(size)
 
+        # Use FULL term names (no truncation)
         if name_dict:
-            label = get_term_name(node, name_dict, max_length=15)
+            label = get_term_name(node, name_dict, max_length=None)  # No truncation
         else:
-            label = node[:12] if len(node) > 12 else node
+            label = node  # Show full GO ID
         node_labels[node] = label
 
-    # Create figure
-    fig, ax = plt.subplots(1, 1, figsize=(16, 12))
+    # Create larger figure to accommodate full labels
+    fig, ax = plt.subplots(1, 1, figsize=(20, 16))  # Increased from (16, 12)
 
     # Colormap
     if direction == 'positive':
@@ -296,11 +297,11 @@ def plot_multiple_lineages_combined(top_lineages, rlipp_dict, graph, output_file
         ax=ax
     )
 
-    # Draw labels
+    # Draw labels with larger font
     nx.draw_networkx_labels(
         subgraph, pos,
         labels=node_labels,
-        font_size=8,
+        font_size=12,  # Increased from 8 to 12
         font_weight='bold',
         ax=ax
     )
