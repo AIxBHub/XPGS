@@ -121,7 +121,8 @@ def extract_term_embeddings_per_sample(model, x_data, device):
 
     model.eval()
     with torch.no_grad():
-        x_data = x_data.to(device)
+        # Convert to float and move to device
+        x_data = x_data.float().to(device)
 
         # Forward pass through the model
         term_embeddings = {}

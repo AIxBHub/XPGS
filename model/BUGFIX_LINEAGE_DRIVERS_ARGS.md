@@ -5,7 +5,7 @@
 
 ## Summary
 
-Fixed 5 bugs in `analyze_lineage_drivers.py` to make it work with the VNN model architecture.
+Fixed 6 bugs in `analyze_lineage_drivers.py` to make it work with the VNN model architecture.
 
 ## Problem 1: MinimalArgs Missing Attributes
 
@@ -45,6 +45,13 @@ ValueError: Test file dict must contain 'x' and 'y' keys
 After fixing Problems 1-4, got error:
 ```
 AttributeError: 'DCellNN' object has no attribute 'term_nn_dict'
+```
+
+## Problem 6: Data Type Mismatch
+
+After fixing Problems 1-5, got error:
+```
+RuntimeError: mat1 and mat2 must have the same dtype, but got Char and Float
 ```
 
 ## Root Cause 1: Missing Attributes
@@ -246,6 +253,26 @@ batchnorm_layer = getattr(model, term + '_batchnorm_layer')
 out = batchnorm_layer(out)
 ```
 
+## Root Cause 6: Data Type Mismatch
+
+Test data was loaded as `torch.int8` (Char type) but the model layers expect `torch.float32`.
+
+This happens when genotype data is saved as integer types (0/1 for mutations) to save memory.
+
+## Solution 6: Convert to Float
+
+Convert input data to float before processing:
+
+```python
+def extract_term_embeddings_per_sample(model, x_data, device):
+    model.eval()
+    with torch.no_grad():
+        # Convert to float and move to device
+        x_data = x_data.float().to(device)
+
+        # Now process...
+```
+
 ## Why Dummy Values Are OK
 
 The `analyze_lineage_drivers.py` script only uses `TrainingDataWrapper` for:
@@ -273,6 +300,7 @@ The training hyperparameters and output configuration are **NOT** used because:
 ✅ **Problem 3**: Model loading → Handle full object format
 ✅ **Problem 4**: Test data keys → Check 'X'/'y' first
 ✅ **Problem 5**: Module access → Use getattr() instead of dict lookup
+✅ **Problem 6**: Data type mismatch → Convert input to float32
 
 ## Verification
 

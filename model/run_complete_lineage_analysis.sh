@@ -65,7 +65,7 @@ else
         -genotype_hiddens $GENOTYPE_HIDDENS \
         -output "$RLIPP_OUTPUT" \
         -predictor_epochs 100 \
-        -batchsize 64
+        -batchsize 32768
 
     echo "✓ RLIPP scores saved to: $RLIPP_OUTPUT"
 fi
