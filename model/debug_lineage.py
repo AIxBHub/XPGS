@@ -148,12 +148,14 @@ def main():
 
     # Test path finding
     if roots and leaves:
-        print("\n11. Testing path finding from sample leaf to root:")
+        print("\n11. Testing path finding from root to leaf (edges go parent->child):")
         root = roots[0]
         sample_leaf = leaves[0]
+
+        # Test in CORRECT direction: root to leaf (following edges)
         try:
-            paths = list(nx.all_simple_paths(graph, sample_leaf, root))
-            print(f"    From '{sample_leaf}' to '{root}':")
+            paths = list(nx.all_simple_paths(graph, root, sample_leaf))
+            print(f"    From '{root}' to '{sample_leaf}':")
             print(f"    Found {len(paths)} path(s)")
             if paths:
                 print(f"    First path ({len(paths[0])} terms):")
@@ -161,8 +163,12 @@ def main():
                     print(f"       - {term}")
                 if len(paths[0]) > 5:
                     print(f"       ... ({len(paths[0]) - 5} more terms)")
+                print(f"\n    ✓ SUCCESS: Graph is properly connected!")
+                print(f"    Note: Lineage analysis will reverse these paths to go leaf->root")
+            else:
+                print(f"    ERROR: Path list is empty!")
         except nx.NetworkXNoPath:
-            print(f"    ERROR: No path found from '{sample_leaf}' to '{root}'!")
+            print(f"    ✗ ERROR: No path found from '{root}' to '{sample_leaf}'!")
             print("    This suggests the graph is not properly connected.")
 
     print("\n" + "="*70)

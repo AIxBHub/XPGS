@@ -60,12 +60,16 @@ def find_all_paths_to_root(graph, root):
     Find all paths from each leaf node to the root.
 
     Args:
-        graph (networkx.DiGraph): Ontology graph
+        graph (networkx.DiGraph): Ontology graph (edges go FROM parent TO child)
         root (str): Root term
 
     Returns:
         dict: Maps leaf terms to list of paths to root
               Each path is a list of terms from leaf to root
+
+    Note:
+        Since edges go parent->child, we need to traverse BACKWARDS from leaf to root.
+        We do this by reversing the graph or by finding paths from root to leaf and reversing them.
     """
     # Find all leaf nodes (nodes with no children)
     leaves = [n for n in graph.nodes() if graph.out_degree(n) == 0]
@@ -73,13 +77,17 @@ def find_all_paths_to_root(graph, root):
     all_paths = {}
 
     for leaf in leaves:
-        # Find all simple paths from leaf to root
+        # Since edges go parent->child, we need to find paths from root to leaf
+        # then reverse them to get leaf->root paths
         try:
-            paths = list(nx.all_simple_paths(graph, leaf, root))
-            if paths:
-                all_paths[leaf] = paths
+            # Find paths from root to leaf (following edges forward)
+            paths_root_to_leaf = list(nx.all_simple_paths(graph, root, leaf))
+            if paths_root_to_leaf:
+                # Reverse each path to get leaf to root
+                paths_leaf_to_root = [list(reversed(path)) for path in paths_root_to_leaf]
+                all_paths[leaf] = paths_leaf_to_root
         except nx.NetworkXNoPath:
-            # No path from this leaf to root (disconnected component)
+            # No path from root to this leaf (disconnected component)
             continue
 
     return all_paths
