@@ -75,15 +75,36 @@ def load_test_data(test_file):
 
     # Handle different possible formats
     if isinstance(data, dict):
-        if 'x' in data and 'y' in data:
+        print(f"Test file is a dict with keys: {list(data.keys())}")
+
+        # Try common key patterns (VNN default is capital X and lowercase y)
+        if 'X' in data and 'y' in data:
+            x_test = data['X']
+            y_test = data['y']
+        elif 'x' in data and 'y' in data:
             x_test = data['x']
             y_test = data['y']
+        elif 'X' in data and 'Y' in data:
+            x_test = data['X']
+            y_test = data['Y']
+        elif 'features' in data and 'labels' in data:
+            x_test = data['features']
+            y_test = data['labels']
+        elif 'genotype' in data and 'phenotype' in data:
+            x_test = data['genotype']
+            y_test = data['phenotype']
+        elif 'data' in data and 'target' in data:
+            x_test = data['data']
+            y_test = data['target']
         else:
-            raise ValueError("Test file dict must contain 'x' and 'y' keys")
+            # Show available keys to help debug
+            print(f"Available keys: {list(data.keys())}")
+            raise ValueError(f"Test file dict must contain data/label keys. Found keys: {list(data.keys())}")
     elif isinstance(data, (list, tuple)) and len(data) >= 2:
+        print(f"Test file is a {type(data).__name__} with {len(data)} elements")
         x_test, y_test = data[0], data[1]
     else:
-        raise ValueError("Unsupported test data format")
+        raise ValueError(f"Unsupported test data format: {type(data).__name__}")
 
     print(f"Test data: {x_test.shape[0]} samples, {x_test.shape[1]} features")
     return x_test, y_test
