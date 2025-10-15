@@ -39,14 +39,8 @@ def load_model_and_data(model_path, data_wrapper):
     """Load trained model."""
     print(f"Loading model from: {model_path}")
 
-    model = DCellNN(
-        term_size_map=data_wrapper.term_size_map,
-        term_direct_gene_map=data_wrapper.term_direct_gene_map,
-        dG=data_wrapper.dG,
-        gene_dim=len(data_wrapper.gene_id_mapping),
-        num_hiddens_genotype=data_wrapper.num_hiddens_genotype,
-        cuda_id=data_wrapper.cuda
-    )
+    # DCellNN expects a data_wrapper object
+    model = DCellNN(data_wrapper)
 
     checkpoint = torch.load(model_path, map_location=data_wrapper.cuda)
     model.load_state_dict(checkpoint['model_state_dict'])

@@ -1,16 +1,23 @@
-# Bug Fix: MinimalArgs Missing Attributes
+# Bug Fix: MinimalArgs Missing Attributes & DCellNN Constructor
 
 ## Date
 2025-10-15
 
-## Problem
+## Problem 1: MinimalArgs Missing Attributes
 
 When running `analyze_lineage_drivers.py`, got error:
 ```
 AttributeError: 'MinimalArgs' object has no attribute 'lr'
 ```
 
-## Root Cause
+## Problem 2: DCellNN Constructor
+
+After fixing Problem 1, got error:
+```
+TypeError: DCellNN.__init__() got an unexpected keyword argument 'term_size_map'
+```
+
+## Root Cause 1: Missing Attributes
 
 The `MinimalArgs` class only provided a subset of attributes required by `TrainingDataWrapper.__init__()`:
 
@@ -30,7 +37,27 @@ The `MinimalArgs` class only provided a subset of attributes required by `Traini
 - `train`, `test`, `testsetratio`
 - `optimize`
 
-## Solution
+## Root Cause 2: Wrong DCellNN Constructor Call
+
+The original code called `DCellNN` with individual parameters:
+```python
+model = DCellNN(
+    term_size_map=data_wrapper.term_size_map,
+    term_direct_gene_map=data_wrapper.term_direct_gene_map,
+    dG=data_wrapper.dG,
+    gene_dim=len(data_wrapper.gene_id_mapping),
+    num_hiddens_genotype=data_wrapper.num_hiddens_genotype,
+    cuda_id=data_wrapper.cuda
+)
+```
+
+But `DCellNN.__init__()` actually expects a **single `data_wrapper` object**:
+```python
+def __init__(self, data_wrapper):
+    # ...
+```
+
+## Solution 1: Add All Required Attributes
 
 Added all required attributes to `MinimalArgs` with dummy values (since they're not used for inference):
 
@@ -67,11 +94,31 @@ class MinimalArgs:
         self.optimize = 0
 ```
 
+## Solution 2: Fix DCellNN Constructor Call
+
+Changed from passing individual parameters to passing the data_wrapper object:
+
+```python
+def load_model_and_data(model_path, data_wrapper):
+    """Load trained model."""
+    print(f"Loading model from: {model_path}")
+
+    # DCellNN expects a data_wrapper object
+    model = DCellNN(data_wrapper)
+
+    checkpoint = torch.load(model_path, map_location=data_wrapper.cuda)
+    model.load_state_dict(checkpoint['model_state_dict'])
+    model.eval()
+
+    return model
+```
+
 ## Why Dummy Values Are OK
 
 The `analyze_lineage_drivers.py` script only uses `TrainingDataWrapper` for:
 1. Loading ontology structure (via `self.load_ontology()`)
 2. Loading gene-to-ID mapping (via `utils.load_mapping()`)
+3. Providing configuration to `DCellNN` constructor
 
 The training hyperparameters and output configuration are **NOT** used because:
 - No training is performed (model already trained)
@@ -80,7 +127,9 @@ The training hyperparameters and output configuration are **NOT** used because:
 
 ## Files Modified
 
-- **[analyze_lineage_drivers.py](analyze_lineage_drivers.py)** (lines 378-409)
+- **[analyze_lineage_drivers.py](analyze_lineage_drivers.py)**
+  - Lines 378-409: Added all required attributes to MinimalArgs
+  - Lines 38-50: Fixed DCellNN constructor call
 
 ## Verification
 
