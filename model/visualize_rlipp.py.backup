@@ -75,14 +75,7 @@ def plot_top_terms(df, output_prefix, top_n=20, name_dict=None):
     colors_neg = ['green' if x > 0 else 'red' for x in bottom_negative['rlipp']]
     ax2.barh(range(len(bottom_negative)), bottom_negative['rlipp'], color=colors_neg, alpha=0.7)
     ax2.set_yticks(range(len(bottom_negative)))
-
-    # Use term names if available
-    if name_dict:
-        labels_neg = [format_term_label(term, name_dict, include_id=False, max_length=60)
-                      for term in bottom_negative['term']]
-    else:
-        labels_neg = bottom_negative['term']
-    ax2.set_yticklabels(labels_neg, fontsize=8)
+    ax2.set_yticklabels(bottom_negative['term'], fontsize=8)
     ax2.set_xlabel('RLIPP Score', fontsize=12)
     ax2.set_title(f'Bottom {top_n} Terms by RLIPP Score (Negative)', fontsize=14, fontweight='bold')
     ax2.axvline(x=0, color='black', linestyle='-', linewidth=0.5)
@@ -247,7 +240,6 @@ def main():
     parser.add_argument('-input', help='Input RLIPP scores TSV file', type=str, required=True)
     parser.add_argument('-output', help='Output prefix for plots', type=str, default='rlipp_viz')
     parser.add_argument('-top_n', help='Number of top terms to show', type=int, default=20)
-    parser.add_argument('-obo', help='GO OBO file for term names (optional)', type=str, default=None)
 
     args = parser.parse_args()
 
@@ -256,25 +248,10 @@ def main():
     df = pd.read_csv(args.input, sep='\t')
     print(f"Loaded {len(df)} terms\n")
 
-    # Load GO term names if OBO file provided
-    name_dict = None
-    if args.obo and OBO_SUPPORT:
-        print(f"Loading GO term names from: {args.obo}")
-        try:
-            name_dict = create_term_name_dict(args.obo)
-            print(f"Loaded {len(name_dict)} term names\n")
-        except Exception as e:
-            print(f"Warning: Could not load OBO file: {e}")
-            print("Continuing with GO IDs...\n")
-            name_dict = None
-    elif args.obo and not OBO_SUPPORT:
-        print("Warning: OBO file provided but obo_parser module not available")
-        print("Continuing with GO IDs...\n")
-
     # Create visualizations
     print("Generating visualizations...")
-    plot_rlipp_distribution(df, args.output, name_dict)
-    plot_top_terms(df, args.output, args.top_n, name_dict)
+    plot_rlipp_distribution(df, args.output)
+    plot_top_terms(df, args.output, args.top_n)
     plot_rlipp_by_layer(df, args.output)
     plot_power_comparison(df, args.output)
     plot_children_analysis(df, args.output)
