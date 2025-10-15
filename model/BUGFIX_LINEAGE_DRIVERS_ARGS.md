@@ -1,7 +1,11 @@
-# Bug Fix: MinimalArgs Missing Attributes & DCellNN Constructor
+# Bug Fix: Lineage Driver Analysis - Multiple Issues
 
 ## Date
 2025-10-15
+
+## Summary
+
+Fixed 5 bugs in `analyze_lineage_drivers.py` to make it work with the VNN model architecture.
 
 ## Problem 1: MinimalArgs Missing Attributes
 
@@ -27,6 +31,20 @@ TypeError: 'DCellNN' object is not subscriptable
 This occurred on the line:
 ```python
 model.load_state_dict(checkpoint['model_state_dict'])
+```
+
+## Problem 4: Test Data Key Names
+
+After fixing Problems 1-3, got error:
+```
+ValueError: Test file dict must contain 'x' and 'y' keys
+```
+
+## Problem 5: Module Access Method
+
+After fixing Problems 1-4, got error:
+```
+AttributeError: 'DCellNN' object has no attribute 'term_nn_dict'
 ```
 
 ## Root Cause 1: Missing Attributes
@@ -169,6 +187,65 @@ This handles:
 2. **Full object format**: `torch.save(model, path)` (VNN default)
 3. **Plain dict format**: State dict saved directly as dict
 
+## Root Cause 4: Test Data Format
+
+VNN uses capital `'X'` and lowercase `'y'` as keys in test `.pt` files (from `prepare_dataloader.py`):
+```python
+"""Expected .pt file format:
+    "X": Tensor of shape (n_samples, n_features)
+    "y": Tensor of shape (n_samples,)
+"""
+```
+
+The original code checked for lowercase `'x'` first.
+
+## Solution 4: Check VNN Format First
+
+Reordered key checks to try `'X'` and `'y'` first:
+```python
+if 'X' in data and 'y' in data:  # VNN default
+    x_test = data['X']
+    y_test = data['y']
+elif 'x' in data and 'y' in data:  # Alternative
+    # ...
+```
+
+## Root Cause 5: Module Storage Method
+
+`DCellNN` doesn't store modules in a `term_nn_dict` dictionary. Instead, it uses `add_module()` to register modules with names like:
+- `{term}_direct_gene_layer`
+- `{term}_dropout_layer`
+- `{term}_linear_layer`
+- `{term}_batchnorm_layer`
+
+The original code tried:
+```python
+term_nn_dict = model.term_nn_dict[term]  # FAILS! No such attribute
+```
+
+## Solution 5: Use getattr() to Access Modules
+
+Rewrote `extract_term_embeddings_per_sample()` to use `getattr()` and `hasattr()`:
+
+```python
+# Access modules by name
+direct_gene_layer = getattr(model, term + '_direct_gene_layer')
+gene_out = direct_gene_layer(gene_input)
+
+# Check if dropout exists (only for higher layers)
+if hasattr(model, term + '_dropout_layer'):
+    dropout_layer = getattr(model, term + '_dropout_layer')
+    term_input = dropout_layer(term_input)
+
+# Apply transformations
+linear_layer = getattr(model, term + '_linear_layer')
+out = linear_layer(term_input)
+out = torch.tanh(out)
+
+batchnorm_layer = getattr(model, term + '_batchnorm_layer')
+out = batchnorm_layer(out)
+```
+
 ## Why Dummy Values Are OK
 
 The `analyze_lineage_drivers.py` script only uses `TrainingDataWrapper` for:
@@ -184,8 +261,18 @@ The training hyperparameters and output configuration are **NOT** used because:
 ## Files Modified
 
 - **[analyze_lineage_drivers.py](analyze_lineage_drivers.py)**
-  - Lines 378-409: Added all required attributes to MinimalArgs
-  - Lines 38-67: Fixed DCellNN constructor call and model loading
+  - Lines 378-409: Added all required attributes to MinimalArgs (Problem 1)
+  - Lines 38-67: Fixed DCellNN constructor call and model loading (Problems 2 & 3)
+  - Lines 70-110: Fixed test data loading with multiple format support (Problem 4)
+  - Lines 113-181: Rewrote embedding extraction using getattr() (Problem 5)
+
+## All Issues Resolved
+
+✅ **Problem 1**: MinimalArgs missing attributes → Added all required attributes
+✅ **Problem 2**: DCellNN constructor → Pass data_wrapper object
+✅ **Problem 3**: Model loading → Handle full object format
+✅ **Problem 4**: Test data keys → Check 'X'/'y' first
+✅ **Problem 5**: Module access → Use getattr() instead of dict lookup
 
 ## Verification
 

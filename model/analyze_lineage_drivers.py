@@ -126,35 +126,53 @@ def extract_term_embeddings_per_sample(model, x_data, device):
         # Forward pass through the model
         term_embeddings = {}
 
-        # Get gene embeddings
+        # Get gene embeddings - first pass through direct gene layers
         gene_input = x_data
 
-        # Process through each layer
+        # Process through each layer (bottom to top)
         for i, layer_terms in enumerate(model.term_layer_list):
             for term in layer_terms:
-                # Get the term's computation module
-                term_nn_dict = model.term_nn_dict[term]
-
                 # Get inputs for this term
-                if i == 0:
-                    # First layer: directly from genes
-                    term_mask = model.term_direct_gene_map[term]
-                    term_input = utils.build_input_vector(gene_input, term_mask)
-                else:
-                    # Higher layers: from children terms
-                    child_terms = model.term_neighbor_map[term]
-                    child_inputs = [term_embeddings[child] for child in child_terms]
-                    if child_inputs:
-                        term_input = torch.cat(child_inputs, dim=1)
-                    else:
-                        continue
+                child_terms = model.term_neighbor_map[term]
 
-                # Forward through this term's network
-                out = term_nn_dict['dropout'](term_input)
-                out = term_nn_dict['linear'](out)
+                # Collect inputs from children and genes
+                inputs = []
+
+                # Add child term embeddings
+                for child in child_terms:
+                    if child in term_embeddings:
+                        inputs.append(term_embeddings[child])
+
+                # Add direct gene input for this term
+                if term in model.term_direct_gene_map:
+                    # Get the direct gene layer
+                    direct_gene_layer = getattr(model, term + '_direct_gene_layer')
+                    gene_out = direct_gene_layer(gene_input)
+                    inputs.append(gene_out)
+
+                # Concatenate all inputs
+                if inputs:
+                    term_input = torch.cat(inputs, dim=1)
+                else:
+                    print(f"Warning: Term {term} has no inputs, skipping")
+                    continue
+
+                # Apply dropout if it exists (only for higher layers)
+                dropout_name = term + '_dropout_layer'
+                if hasattr(model, dropout_name):
+                    dropout_layer = getattr(model, dropout_name)
+                    term_input = dropout_layer(term_input)
+
+                # Apply linear transformation
+                linear_layer = getattr(model, term + '_linear_layer')
+                out = linear_layer(term_input)
+
+                # Apply activation
                 out = torch.tanh(out)
-                if 'batchnorm' in term_nn_dict:
-                    out = term_nn_dict['batchnorm'](out)
+
+                # Apply batch normalization
+                batchnorm_layer = getattr(model, term + '_batchnorm_layer')
+                out = batchnorm_layer(out)
 
                 # Store embedding (shape: n_samples x hidden_dim)
                 term_embeddings[term] = out.cpu()
