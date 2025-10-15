@@ -17,11 +17,12 @@ class RLIPPCalculator:
     Negative RLIPP = term decreases predictive power
     """
 
-    def __init__(self, model, data_wrapper, device):
+    def __init__(self, model, data_wrapper, device, predictor_epochs=100):
         self.model = model
         self.model.eval()
         self.data_wrapper = data_wrapper
         self.device = device
+        self.predictor_epochs = predictor_epochs
         self.model.to(device)
 
     def get_embeddings_and_labels(self, data_loader):
@@ -131,7 +132,7 @@ class RLIPPCalculator:
                 if len(children) == 0:
                     # Leaf node - no children to compare against
                     # Calculate predictive power using term embedding only
-                    term_power = self.calculate_predictive_power(term_embedding, all_labels)
+                    term_power = self.calculate_predictive_power(term_embedding, all_labels, epochs=self.predictor_epochs)
                     rlipp_scores[term] = {
                         'rlipp': term_power,  # For leaf nodes, RLIPP is just the predictive power
                         'term_power': term_power,
@@ -145,10 +146,10 @@ class RLIPPCalculator:
                     combined_children = torch.cat(children_embeddings, dim=1)
 
                     # Calculate predictive power with term embedding
-                    term_power = self.calculate_predictive_power(term_embedding, all_labels)
+                    term_power = self.calculate_predictive_power(term_embedding, all_labels, epochs=self.predictor_epochs)
 
                     # Calculate predictive power with only children embeddings
-                    children_power = self.calculate_predictive_power(combined_children, all_labels)
+                    children_power = self.calculate_predictive_power(combined_children, all_labels, epochs=self.predictor_epochs)
 
                     # Calculate RLIPP (relative improvement)
                     # Normalize by the maximum absolute value to get relative improvement
@@ -253,15 +254,14 @@ def main():
     minimal_args.optimize = 1
     minimal_args.metric_output = 'temp.tsv'
 
-    data_wrapper = TrainingDataWrapper(minimal_args)
+    data_wrapper = TrainingDataWrapper(minimal_args, logger=None)
 
     # Load test data
     print(f"\nLoading test data from: {args.test}")
     _, test_loader = prepare_dataloader.get_from_pt(args.test, args.test, args.batchsize)
 
     # Calculate RLIPP scores
-    calculator = RLIPPCalculator(model, data_wrapper, device)
-    calculator.calculate_predictive_power.epochs = args.predictor_epochs
+    calculator = RLIPPCalculator(model, data_wrapper, device, predictor_epochs=args.predictor_epochs)
 
     rlipp_scores = calculator.calculate_rlipp_scores(test_loader)
 
