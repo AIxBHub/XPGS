@@ -176,10 +176,15 @@ def extract_term_embeddings_per_sample(model, x_data, device):
                 out = batchnorm_layer(out)
 
                 # Store embedding (shape: n_samples x hidden_dim)
-                term_embeddings[term] = out.cpu()
+                # Keep on same device for now, will move to CPU at the end
+                term_embeddings[term] = out
 
+    # Move all embeddings to CPU for analysis
     print(f"Extracted embeddings for {len(term_embeddings)} terms")
-    return term_embeddings
+    print("Moving embeddings to CPU for analysis...")
+    term_embeddings_cpu = {term: emb.cpu() for term, emb in term_embeddings.items()}
+
+    return term_embeddings_cpu
 
 
 def analyze_sample_contributions(term_embeddings, lineage_path, y_test):

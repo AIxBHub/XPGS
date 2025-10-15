@@ -5,7 +5,7 @@
 
 ## Summary
 
-Fixed 6 bugs in `analyze_lineage_drivers.py` to make it work with the VNN model architecture.
+Fixed 7 bugs in `analyze_lineage_drivers.py` to make it work with the VNN model architecture.
 
 ## Problem 1: MinimalArgs Missing Attributes
 
@@ -52,6 +52,13 @@ AttributeError: 'DCellNN' object has no attribute 'term_nn_dict'
 After fixing Problems 1-5, got error:
 ```
 RuntimeError: mat1 and mat2 must have the same dtype, but got Char and Float
+```
+
+## Problem 7: Device Mismatch
+
+After fixing Problems 1-6, got error:
+```
+RuntimeError: Expected all tensors to be on the same device, but found at least two devices, cpu and cuda:0!
 ```
 
 ## Root Cause 1: Missing Attributes
@@ -273,6 +280,33 @@ def extract_term_embeddings_per_sample(model, x_data, device):
         # Now process...
 ```
 
+## Root Cause 7: Device Mismatch
+
+The original code moved embeddings to CPU immediately after computing them:
+```python
+term_embeddings[term] = out.cpu()  # Move to CPU
+```
+
+But then tried to concatenate with embeddings still on CUDA in the next layer:
+```python
+inputs = [term_embeddings[child] for child in child_terms]  # Some CPU, some CUDA
+term_input = torch.cat(inputs, dim=1)  # ERROR! Mixed devices
+```
+
+## Solution 7: Keep All Tensors on Same Device
+
+Keep embeddings on the computation device (CUDA/CPU) during processing, move to CPU only at the end:
+
+```python
+# During processing - keep on device
+term_embeddings[term] = out  # Stay on CUDA/CPU (whatever device is)
+
+# At the end - move all to CPU for analysis
+print("Moving embeddings to CPU for analysis...")
+term_embeddings_cpu = {term: emb.cpu() for term, emb in term_embeddings.items()}
+return term_embeddings_cpu
+```
+
 ## Why Dummy Values Are OK
 
 The `analyze_lineage_drivers.py` script only uses `TrainingDataWrapper` for:
@@ -301,6 +335,7 @@ The training hyperparameters and output configuration are **NOT** used because:
 ✅ **Problem 4**: Test data keys → Check 'X'/'y' first
 ✅ **Problem 5**: Module access → Use getattr() instead of dict lookup
 ✅ **Problem 6**: Data type mismatch → Convert input to float32
+✅ **Problem 7**: Device mismatch → Keep tensors on device during processing
 
 ## Verification
 
