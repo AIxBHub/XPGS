@@ -377,11 +377,34 @@ def main():
     # Create minimal args for data wrapper
     class MinimalArgs:
         def __init__(self):
+            # Required files
             self.onto = args.onto
             self.gene2id = args.gene2id
+
+            # Model architecture
             self.genotype_hiddens = args.genotype_hiddens
             self.min_dropout_layer = 2
             self.dropout_fraction = 0.3
+
+            # Training hyperparameters (dummy values, not used for inference)
+            self.lr = 0.001
+            self.wd = 0.001
+            self.alpha = 0.3
+            self.epoch = 100
+            self.batchsize = 64
+
+            # Output configuration (dummy values, not used)
+            self.modeldir = '.'
+            self.delta = 0.001
+            self.metric_output = 'metrics.tsv'
+
+            # Dataset configuration (dummy values, not used)
+            self.train = None
+            self.test = None
+            self.testsetratio = 0.2
+
+            # Optimization (not used for inference)
+            self.optimize = 0
 
     minimal_args = MinimalArgs()
 
