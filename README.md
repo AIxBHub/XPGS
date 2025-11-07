@@ -1,11 +1,11 @@
 # Blood Cell Trait Variant Processing & VNN Training
 
-Interpretable genomic prediction pipeline for blood cell traits using Visible Neural Networks (VNN).
+Interpretable polygenic score (PGS) model for blood cell traits using Visible Neural Networks (VNN).
 
 ## Workflow Overview
 
 ```mermaid
-flowchart LR
+flowchart TB
     A[PGS Catalog] -->|pgs_utils.py| B[Variant Processing]
     B -->|Nextflow| C[Annotated Variants]
     C -->|Biomedical KG| D[VNN Training]
@@ -19,9 +19,9 @@ flowchart LR
 ```
 
 **Pipeline Stages:**
-1. **Data Preprocessing** (A→B→C): Extract variants from PGS models → Subset genotypes → Annotate with snpEff → Map to genes
-2. **ML Training** (D): Construct VNN with ontologies derived from biomedical knowledge graph → Train model on genotype-phenotype data
-3. **Evaluation** (E): Calculate RLIPP scores → Identify important biological subsystems
+1. **Data Preprocessing** (A→B→C): Extract variants from PGS Catalog → Subset genotypes → Annotate with snpEff → Map to genes
+2. **ML Training** (D): Construct interpretable VNN-based PGS model with biomedical knowledge graph ontologies → Train on genotype-phenotype data
+3. **Evaluation** (E): Calculate RLIPP scores → Interpret biological mechanisms underlying PGS predictions
 
 ---
 
@@ -48,7 +48,7 @@ sbatch src/runNF.sh
 ### Step 2: ML Training
 
 ```bash
-# Train VNN model
+# Train interpretable VNN-based PGS model
 python model/run_vnn.py \
     -onto data/ontology.txt \
     -gene2id data/gene2ind.txt \
@@ -109,7 +109,7 @@ sbatch src/runNF.sh
 
 ### 2. ML Training
 
-Train Visible Neural Network with ontologies derived from biomedical knowledge graph.
+Train interpretable VNN-based PGS model using ontologies derived from biomedical knowledge graph.
 
 **Key parameters:**
 
@@ -128,6 +128,7 @@ Train Visible Neural Network with ontologies derived from biomedical knowledge g
 **Example:**
 
 ```bash
+# Train interpretable PGS model with custom parameters
 python model/run_vnn.py \
     -onto data/ontology.txt \
     -gene2id data/gene2ind.txt \
@@ -160,7 +161,7 @@ MODEL/
 
 ### 3. Evaluation
 
-Calculate RLIPP scores to identify important biological subsystems.
+Calculate RLIPP scores to interpret biological mechanisms underlying the PGS model predictions.
 
 ```bash
 # Configure model path in run_rlipp.sh
@@ -213,10 +214,10 @@ See [RLIPP_README.md](RLIPP_README.md) for details.
 - Apptainer cache: `.cache/` (default)
 
 **Model architecture:**
-Network topology is defined by variant subset, not predefined subgraphs. Ontologies derived from biomedical knowledge graph are used to construct the VNN structure based on genes containing variants.
+Network topology is defined by variant subset, not predefined subgraphs. Ontologies derived from biomedical knowledge graph are used to construct an interpretable VNN-based PGS model structure based on genes containing variants.
 
 **Pipeline flow:**
-PGS models → variant subset → genotype extraction → annotation → effect filtering → gene mapping → biomedical KG ontologies → VNN structure
+PGS Catalog variants → variant subset → genotype extraction → annotation → effect filtering → gene mapping → biomedical KG ontologies → interpretable VNN-based PGS model
 
 **Summary statistics:**
 - https://pmc.ncbi.nlm.nih.gov/articles/PMC7482360/
