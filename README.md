@@ -1,4 +1,4 @@
-# Blood Cell Trait Variant Processing & VNN Training
+# Biologically-informed interpretable polygenic score architecture
 
 Interpretable polygenic score (PGS) model for blood cell traits using Visible Neural Networks (VNN).
 
