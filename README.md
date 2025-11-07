@@ -5,26 +5,23 @@ Interpretable genomic prediction pipeline for blood cell traits using Visible Ne
 ## Workflow Overview
 
 ```mermaid
-flowchart TB
-    subgraph "1. Data Preprocessing"
-        A[PGS Catalog] -->|pgs_utils.py| B[Union Variants]
-        B --> C[Imputed Genotypes]
-        C -->|Nextflow Pipeline| D[Variant Subsetting]
-        D --> E[snpEff Annotation]
-        E --> F[Annotated VCF + Gene Mapping]
-    end
+flowchart LR
+    A[PGS Catalog] -->|pgs_utils.py| B[Variant Processing]
+    B -->|Nextflow| C[Annotated Variants]
+    C -->|Biomedical KG| D[VNN Training]
+    D --> E[RLIPP Analysis]
 
-    subgraph "2. ML Training"
-        F --> G[VNN Construction]
-        G -->|GO Ontology| H[VNN Training]
-        H --> I[Trained Model]
-    end
-
-    subgraph "3. Evaluation"
-        I --> J[RLIPP Calculation]
-        J --> K[Biological Interpretation]
-    end
+    style A fill:#e1f5ff
+    style B fill:#e1f5ff
+    style C fill:#e1f5ff
+    style D fill:#fff4e1
+    style E fill:#e8f5e9
 ```
+
+**Pipeline Stages:**
+1. **Data Preprocessing** (A→B→C): Extract variants from PGS models → Subset genotypes → Annotate with snpEff → Map to genes
+2. **ML Training** (D): Construct VNN with ontologies derived from biomedical knowledge graph → Train model on genotype-phenotype data
+3. **Evaluation** (E): Calculate RLIPP scores → Identify important biological subsystems
 
 ---
 
@@ -34,6 +31,7 @@ flowchart TB
 - Python 3.7+, PyTorch, NetworkX
 - Nextflow, Apptainer
 - snpEff, bcftools, plink2
+- Biomedical knowledge graph ontologies
 
 ### Step 1: Data Preprocessing
 
@@ -52,7 +50,7 @@ sbatch src/runNF.sh
 ```bash
 # Train VNN model
 python model/run_vnn.py \
-    -onto data/GO_terms.txt \
+    -onto data/ontology.txt \
     -gene2id data/gene2ind.txt \
     -train data/train.pt \
     -test data/test.pt \
@@ -111,13 +109,13 @@ sbatch src/runNF.sh
 
 ### 2. ML Training
 
-Train Visible Neural Network with GO ontology structure.
+Train Visible Neural Network with ontologies derived from biomedical knowledge graph.
 
 **Key parameters:**
 
 | Parameter | Description | Default |
 |-----------|-------------|---------|
-| `-onto` | GO ontology file | required |
+| `-onto` | Ontology file from biomedical KG | required |
 | `-gene2id` | Gene-to-ID mapping | required |
 | `-train` | Training data (.pt) | required |
 | `-test` | Test data (.pt) | None |
@@ -131,7 +129,7 @@ Train Visible Neural Network with GO ontology structure.
 
 ```bash
 python model/run_vnn.py \
-    -onto data/GO_terms.txt \
+    -onto data/ontology.txt \
     -gene2id data/gene2ind.txt \
     -train data/train_data.pt \
     -test data/test_data.pt \
@@ -215,10 +213,10 @@ See [RLIPP_README.md](RLIPP_README.md) for details.
 - Apptainer cache: `.cache/` (default)
 
 **Model architecture:**
-Network topology is defined by variant subset, not predefined GO subgraphs. All GO terms associated with genes containing variants are included.
+Network topology is defined by variant subset, not predefined subgraphs. Ontologies derived from biomedical knowledge graph are used to construct the VNN structure based on genes containing variants.
 
 **Pipeline flow:**
-PGS models → variant subset → genotype extraction → annotation → effect filtering → gene mapping → GO terms → VNN structure
+PGS models → variant subset → genotype extraction → annotation → effect filtering → gene mapping → biomedical KG ontologies → VNN structure
 
 **Summary statistics:**
 - https://pmc.ncbi.nlm.nih.gov/articles/PMC7482360/
